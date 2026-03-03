@@ -1,29 +1,30 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:data_table_2/data_table_2.dart';
 import '../../../../core/theme/theme.dart';
 import '../../../../core/constants/app_icons.dart';
-import '../../../../core/constants/app_constants.dart';
 import '../../../../core/widgets/buttons.dart';
 import '../../../../core/widgets/badges.dart';
 import '../../../../core/widgets/avatar.dart';
 import '../../../../core/widgets/inputs.dart';
 import '../../../../shared/layouts/main_layout.dart';
 import '../../../../shared/layouts/header.dart';
-import '../../../../core/utils/dummy_data.dart';
 import '../../data/models/employee_model.dart';
+import '../../domain/providers/employee_providers.dart';
 import '../widgets/add_employee_drawer.dart';
 import '../widgets/employee_filters.dart';
 
 /// Employee Master Screen - Table view with all employees
-class EmployeeMasterScreen extends StatefulWidget {
+class EmployeeMasterScreen extends ConsumerStatefulWidget {
   const EmployeeMasterScreen({super.key});
 
   @override
-  State<EmployeeMasterScreen> createState() => _EmployeeMasterScreenState();
+  ConsumerState<EmployeeMasterScreen> createState() =>
+      _EmployeeMasterScreenState();
 }
 
-class _EmployeeMasterScreenState extends State<EmployeeMasterScreen> {
+class _EmployeeMasterScreenState extends ConsumerState<EmployeeMasterScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   String? _filterDepartment;
@@ -33,13 +34,13 @@ class _EmployeeMasterScreenState extends State<EmployeeMasterScreen> {
   bool _showFilters = false;
   bool _showAddDrawer = false;
 
-  List<Employee> get _filteredEmployees {
-    var employees = DummyData.employees;
+  List<Employee> _getFilteredEmployees(List<Employee> employees) {
+    var filtered = employees;
 
     // Apply search
     if (_searchQuery.isNotEmpty) {
       final query = _searchQuery.toLowerCase();
-      employees = employees.where((e) {
+      filtered = filtered.where((e) {
         return e.fullName.toLowerCase().contains(query) ||
             e.employeeCode.toLowerCase().contains(query) ||
             e.email.toLowerCase().contains(query) ||
@@ -50,20 +51,20 @@ class _EmployeeMasterScreenState extends State<EmployeeMasterScreen> {
 
     // Apply filters
     if (_filterDepartment != null) {
-      employees = employees
+      filtered = filtered
           .where((e) => e.department == _filterDepartment)
           .toList();
     }
     if (_filterEmployeeType != null) {
-      employees = employees
+      filtered = filtered
           .where((e) => e.employeeType == _filterEmployeeType)
           .toList();
     }
     if (_filterStatus != null) {
-      employees = employees.where((e) => e.status == _filterStatus).toList();
+      filtered = filtered.where((e) => e.status == _filterStatus).toList();
     }
 
-    return employees;
+    return filtered;
   }
 
   void _clearFilters() {
@@ -76,6 +77,9 @@ class _EmployeeMasterScreenState extends State<EmployeeMasterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final employeeState = ref.watch(employeeListProvider);
+    final totalEmployees = employeeState.employees.length;
+
     return Stack(
       children: [
         SingleChildScrollView(
@@ -86,8 +90,7 @@ class _EmployeeMasterScreenState extends State<EmployeeMasterScreen> {
               // Page Header
               PageHeader(
                 title: 'Employee Master',
-                subtitle:
-                    '${DummyData.totalEmployees} employees in your organization',
+                subtitle: '$totalEmployees employees in your organization',
                 breadcrumbs: const ['Home', 'Employee Master'],
                 actions: [
                   SecondaryButton(
@@ -152,9 +155,29 @@ class _EmployeeMasterScreenState extends State<EmployeeMasterScreen> {
         if (_showAddDrawer)
           AddEmployeeDrawer(
             onClose: () => setState(() => _showAddDrawer = false),
-            onSave: (employee) {
-              // TODO: Save employee
+            onSave: (employee) async {
               setState(() => _showAddDrawer = false);
+              try {
+                await ref
+                    .read(employeeListProvider.notifier)
+                    .createEmployee(employee);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Employee saved successfully'),
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to save employee: $e'),
+                      backgroundColor: AppColors.error,
+                    ),
+                  );
+                }
+              }
             },
           ),
       ],
@@ -162,39 +185,52 @@ class _EmployeeMasterScreenState extends State<EmployeeMasterScreen> {
   }
 
   Widget _buildStatsRow() {
+    final employeeState = ref.watch(employeeListProvider);
+    final employees = employeeState.employees;
+
+    final total = employees.length;
+    final officeCount = employees
+        .where((e) => e.employeeType == 'Office')
+        .length;
+    final factoryCount = employees
+        .where((e) => e.employeeType == 'Factory')
+        .length;
+    final activeCount = employees.where((e) => e.status == 'Active').length;
+    final inactiveCount = employees.where((e) => e.status == 'Inactive').length;
+
     return Row(
       children: [
         _MiniStatCard(
           label: 'Total Employees',
-          value: DummyData.totalEmployees.toString(),
+          value: total.toString(),
           icon: AppIcons.employees,
           color: AppColors.primary,
         ),
         const SizedBox(width: AppSpacing.md),
         _MiniStatCard(
           label: 'Office',
-          value: DummyData.officeEmployees.toString(),
+          value: officeCount.toString(),
           icon: AppIcons.office,
           color: AppColors.secondary,
         ),
         const SizedBox(width: AppSpacing.md),
         _MiniStatCard(
           label: 'Factory',
-          value: DummyData.factoryEmployees.toString(),
+          value: factoryCount.toString(),
           icon: AppIcons.factory,
           color: AppColors.accent,
         ),
         const SizedBox(width: AppSpacing.md),
         _MiniStatCard(
           label: 'Active',
-          value: DummyData.activeEmployees.toString(),
+          value: activeCount.toString(),
           icon: AppIcons.active,
           color: AppColors.success,
         ),
         const SizedBox(width: AppSpacing.md),
         _MiniStatCard(
           label: 'Inactive',
-          value: DummyData.inactiveEmployees.toString(),
+          value: inactiveCount.toString(),
           icon: AppIcons.inactive,
           color: AppColors.textTertiary,
         ),
@@ -276,7 +312,49 @@ class _EmployeeMasterScreenState extends State<EmployeeMasterScreen> {
                     text: 'Delete',
                     icon: AppIcons.delete,
                     color: AppColors.error,
-                    onPressed: () {},
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Confirm Deletion'),
+                          content: Text(
+                            'Are you sure you want to delete ${_selectedIds.length} employee(s)? This action cannot be undone.',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              child: const Text('Cancel'),
+                            ),
+                            TextButton(
+                              onPressed: () async {
+                                Navigator.pop(ctx);
+                                for (String id in _selectedIds) {
+                                  await ref
+                                      .read(employeeListProvider.notifier)
+                                      .deleteEmployee(id);
+                                }
+                                setState(() {
+                                  _selectedIds.clear();
+                                });
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Employees deleted successfully',
+                                      ),
+                                    ),
+                                  );
+                                }
+                              },
+                              child: const Text(
+                                'Delete',
+                                style: TextStyle(color: AppColors.error),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),
@@ -288,7 +366,8 @@ class _EmployeeMasterScreenState extends State<EmployeeMasterScreen> {
   }
 
   Widget _buildDataTable() {
-    final employees = _filteredEmployees;
+    final employeeState = ref.watch(employeeListProvider);
+    final employees = _getFilteredEmployees(employeeState.employees);
 
     if (employees.isEmpty) {
       return Center(

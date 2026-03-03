@@ -13,6 +13,9 @@ class MainLayout extends StatefulWidget {
   final ValueChanged<String> onNavigate;
   final List<Widget>? headerActions;
   final bool showSearch;
+  final int notificationCount;
+  final VoidCallback? onNotificationTap;
+  final VoidCallback? onProfileTap;
 
   const MainLayout({
     super.key,
@@ -23,6 +26,9 @@ class MainLayout extends StatefulWidget {
     required this.onNavigate,
     this.headerActions,
     this.showSearch = true,
+    this.notificationCount = 0,
+    this.onNotificationTap,
+    this.onProfileTap,
   });
 
   @override
@@ -60,13 +66,9 @@ class _MainLayoutState extends State<MainLayout> {
                   subtitle: widget.pageSubtitle,
                   actions: widget.headerActions,
                   showSearch: widget.showSearch,
-                  notificationCount: 5,
-                  onNotificationTap: () {
-                    // TODO: Show notifications panel
-                  },
-                  onProfileTap: () {
-                    // TODO: Show profile menu
-                  },
+                  notificationCount: widget.notificationCount,
+                  onNotificationTap: widget.onNotificationTap,
+                  onProfileTap: widget.onProfileTap,
                 ),
 
                 // Page Content

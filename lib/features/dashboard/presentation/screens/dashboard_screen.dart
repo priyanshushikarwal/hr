@@ -5,10 +5,10 @@ import '../../../../core/constants/app_icons.dart';
 import '../../../../core/widgets/stat_card.dart';
 import '../../../../core/widgets/buttons.dart';
 import '../../../../core/widgets/badges.dart';
-import '../../../../core/widgets/avatar.dart';
 import '../../../../shared/layouts/main_layout.dart';
 import '../../../../shared/layouts/header.dart';
 import '../../../../core/utils/dummy_data.dart';
+import '../../../../core/services/appwrite_service.dart';
 import '../widgets/dashboard_charts.dart';
 
 /// Dashboard Screen - Main landing page after login
@@ -27,6 +27,27 @@ class DashboardScreen extends StatelessWidget {
             title: 'Welcome back! 👋',
             subtitle: 'Here\'s what\'s happening with your team today.',
             actions: [
+              SecondaryButton(
+                text: 'Send a ping',
+                icon: AppIcons.check,
+                onPressed: () async {
+                  try {
+                    await client.ping();
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Ping successful!')),
+                      );
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Ping failed: $e')),
+                      );
+                    }
+                  }
+                },
+              ),
+              const SizedBox(width: AppSpacing.sm),
               SecondaryButton(
                 text: 'Download Report',
                 icon: AppIcons.download,

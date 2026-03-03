@@ -642,8 +642,37 @@ class _AddEmployeeDrawerState extends State<AddEmployeeDrawer> {
               if (_currentStep < _steps.length - 1) {
                 setState(() => _currentStep++);
               } else {
-                // Save employee
-                // TODO: Validate and save
+                if (_formKey.currentState?.validate() ?? false) {
+                  final newEmployee = Employee(
+                    id:
+                        widget.employee?.id ??
+                        '', // Appwrite will generate an ID on creation if empty
+                    employeeCode:
+                        widget.employee?.employeeCode ??
+                        'EMP-${DateTime.now().year}-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}',
+                    firstName: _firstNameController.text.trim(),
+                    lastName: _lastNameController.text.trim(),
+                    email: _emailController.text.trim(),
+                    phone: _phoneController.text.trim(),
+                    alternatePhone:
+                        _alternatePhoneController.text.trim().isEmpty
+                        ? null
+                        : _alternatePhoneController.text.trim(),
+                    employeeType: _employeeType ?? 'office',
+                    department: _department ?? 'General',
+                    designation: _designation ?? 'Employee',
+                    joiningDate: _joiningDate ?? DateTime.now(),
+                    dateOfBirth: _dateOfBirth,
+                    gender: _gender,
+                    maritalStatus: _maritalStatus,
+                    status: widget.employee?.status ?? 'Active',
+                    createdAt: widget.employee?.createdAt ?? DateTime.now(),
+                    updatedAt: DateTime.now(),
+                    isPfApplicable: false,
+                    isEsicApplicable: false,
+                  );
+                  widget.onSave(newEmployee);
+                }
               }
             },
           ),

@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../layouts/main_layout.dart';
+import '../../features/notifications/presentation/widgets/notification_panel.dart';
+import '../../features/auth/domain/providers/auth_providers.dart';
+import '../../features/notifications/domain/providers/notification_providers.dart';
 
-/// Shell Screen - Wrapper for main layout
-class ShellScreen extends StatelessWidget {
+/// Shell Screen - Wrapper for main layout with auth context
+class ShellScreen extends ConsumerWidget {
   final String currentRoute;
   final Widget child;
 
@@ -24,6 +28,7 @@ class ShellScreen extends StatelessWidget {
       '/salary/factory': 'Factory Salary',
       '/offer-letters': 'Offer Letters',
       '/attendance': 'Attendance',
+      '/leave-requests': 'Leave Requests',
       '/payments': 'Salary Slip & Payments',
       '/reports': 'Reports',
       '/admin': 'Admin & Roles',
@@ -41,7 +46,7 @@ class ShellScreen extends StatelessWidget {
   String? get _pageSubtitle {
     switch (currentRoute) {
       case '/dashboard':
-        return 'January 26, 2024';
+        return 'Overview and analytics';
       case '/employees':
         return 'Manage all employees';
       case '/kyc':
@@ -54,6 +59,8 @@ class ShellScreen extends StatelessWidget {
         return 'Create and manage offer letters';
       case '/attendance':
         return 'Track employee attendance';
+      case '/leave-requests':
+        return 'Review and manage leave applications';
       case '/payments':
         return 'Process salaries and payments';
       case '/reports':
@@ -68,15 +75,114 @@ class ShellScreen extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final unreadCount = ref.watch(unreadNotificationCountProvider);
+
     return MainLayout(
       currentRoute: currentRoute,
       pageTitle: _pageTitle,
       pageSubtitle: _pageSubtitle,
+      notificationCount: unreadCount,
       onNavigate: (route) {
         context.go(route);
       },
+      onNotificationTap: () {
+        _showNotificationPanel(context);
+      },
+      onProfileTap: () {
+        _showProfileMenu(context, ref);
+      },
       child: child,
+    );
+  }
+
+  void _showNotificationPanel(BuildContext context) {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Notifications',
+      barrierColor: Colors.black26,
+      transitionDuration: const Duration(milliseconds: 250),
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return Align(
+          alignment: Alignment.centerRight,
+          child: SlideTransition(
+            position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero)
+                .animate(
+                  CurvedAnimation(
+                    parent: animation,
+                    curve: Curves.easeOutCubic,
+                  ),
+                ),
+            child: const Material(elevation: 16, child: NotificationPanel()),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showProfileMenu(BuildContext context, WidgetRef ref) {
+    final user = ref.read(currentUserProvider);
+
+    showMenu(
+      context: context,
+      position: const RelativeRect.fromLTRB(double.infinity, 80, 24, 0),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      items: <PopupMenuEntry>[
+        PopupMenuItem(
+          enabled: false,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                user?.name ?? user?.email ?? 'User',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+              Text(
+                user?.role.value.toUpperCase() ?? '',
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              ),
+            ],
+          ),
+        ),
+        const PopupMenuDivider(),
+        PopupMenuItem(
+          child: const Row(
+            children: [
+              Icon(Icons.person_outline, size: 18),
+              SizedBox(width: 8),
+              Text('Profile'),
+            ],
+          ),
+          onTap: () {},
+        ),
+        PopupMenuItem(
+          child: const Row(
+            children: [
+              Icon(Icons.settings_outlined, size: 18),
+              SizedBox(width: 8),
+              Text('Settings'),
+            ],
+          ),
+          onTap: () => context.go('/settings'),
+        ),
+        const PopupMenuDivider(),
+        PopupMenuItem(
+          child: const Row(
+            children: [
+              Icon(Icons.logout_rounded, size: 18, color: Colors.red),
+              SizedBox(width: 8),
+              Text('Logout', style: TextStyle(color: Colors.red)),
+            ],
+          ),
+          onTap: () {
+            ref.read(authProvider.notifier).logout();
+          },
+        ),
+      ],
     );
   }
 }

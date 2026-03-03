@@ -2,10 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 import 'core/theme/app_theme.dart';
+import 'core/services/appwrite_service.dart';
+import 'core/services/realtime_service.dart';
+import 'features/auth/domain/providers/auth_providers.dart';
 import 'shared/navigation/app_router.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Appwrite
+  AppwriteService.instance.initialize();
 
   // Initialize window manager for desktop
   await windowManager.ensureInitialized();
@@ -28,18 +34,71 @@ void main() async {
   runApp(const ProviderScope(child: HRMSApp()));
 }
 
-class HRMSApp extends StatelessWidget {
+class HRMSApp extends ConsumerStatefulWidget {
   const HRMSApp({super.key});
 
   @override
+  ConsumerState<HRMSApp> createState() => _HRMSAppState();
+}
+
+class _HRMSAppState extends ConsumerState<HRMSApp> {
+  @override
+  void initState() {
+    super.initState();
+    // Subscribe to realtime events after first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authState = ref.read(authProvider);
+      if (authState.isAuthenticated) {
+        RealtimeService.instance.subscribeAll();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    RealtimeService.instance.unsubscribeAll();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final authState = ref.watch(authProvider);
+
+    // Subscribe/unsubscribe realtime based on auth state
+    if (authState.isAuthenticated) {
+      RealtimeService.instance.subscribeAll();
+    } else {
+      RealtimeService.instance.unsubscribeAll();
+    }
+
+    // Show loading spinner while checking auth
+    if (authState.status == AuthStatus.initial ||
+        authState.status == AuthStatus.loading) {
+      return MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.lightTheme,
+        home: const Scaffold(
+          body: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Loading...'),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    final router = AppRouter.createRouter(ref);
+
     return MaterialApp.router(
       title: 'HR Management System',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.light,
-      routerConfig: AppRouter.router,
+      routerConfig: router,
       builder: (context, child) {
         // Add custom window title bar for desktop
         return Column(

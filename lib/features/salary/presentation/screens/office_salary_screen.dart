@@ -4,7 +4,6 @@ import '../../../../core/theme/theme.dart';
 import '../../../../core/constants/app_icons.dart';
 import '../../../../core/widgets/buttons.dart';
 import '../../../../core/widgets/badges.dart';
-import '../../../../core/widgets/avatar.dart';
 import '../../../../core/widgets/inputs.dart';
 import '../../../../shared/layouts/main_layout.dart';
 import '../../../../shared/layouts/header.dart';

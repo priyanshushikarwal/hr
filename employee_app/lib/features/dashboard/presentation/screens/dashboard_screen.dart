@@ -228,9 +228,7 @@ class DashboardScreen extends ConsumerWidget {
               icon: Icons.camera_alt_rounded,
               label: 'Visit Mode',
               color: AppColors.statusVisit,
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const _VisitModeRedirect()),
-              ),
+              onTap: () => context.push('/visit'),
             ),
             _QuickAction(
               icon: Icons.person_rounded,
@@ -599,11 +597,4 @@ class _StatusChip extends StatelessWidget {
       s.isEmpty ? s : '${s[0].toUpperCase()}${s.substring(1)}';
 }
 
-class _VisitModeRedirect extends StatelessWidget {
-  const _VisitModeRedirect();
-  @override
-  Widget build(BuildContext context) {
-    // Will be replaced by router navigation
-    return const Scaffold(body: Center(child: Text('Visit Mode')));
-  }
-}
+

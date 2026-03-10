@@ -251,6 +251,28 @@ void main() async {
     _attr('updatedBy', 'string', size: 100),
   ]);
 
+  await _createCollection(databases, 'visits', 'Visits', [
+    _attr('employeeId', 'string', size: 100, required: true),
+    _attr('employeeName', 'string', size: 200),
+    _attr('employeeCode', 'string', size: 50),
+    _attr('purpose', 'string', size: 500, required: true),
+    _attr('clientName', 'string', size: 200),
+    _attr('visitAddress', 'string', size: 500),
+    _attr('visitDate', 'string', size: 50, required: true),
+    _attr('selfieFileId', 'string', size: 100),
+    _attr('latitude', 'double'),
+    _attr('longitude', 'double'),
+    _attr('locationAddress', 'string', size: 500),
+    _attr('selfieTimestamp', 'string', size: 50),
+    _attr('status', 'string', size: 20, required: true),
+    _attr('remarks', 'string', size: 500),
+    _attr('approvedBy', 'string', size: 100),
+    _attr('approvedAt', 'string', size: 50),
+    _attr('rejectionReason', 'string', size: 500),
+    _attr('createdAt', 'string', size: 50, required: true),
+    _attr('updatedAt', 'string', size: 50, required: true),
+  ]);
+
   print('\n✅ All collections created successfully!');
   print('   Your app should now work without collection_not_found errors.');
 }

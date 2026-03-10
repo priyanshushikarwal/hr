@@ -13,6 +13,7 @@ class HiveBoxes {
   static const String payments = 'payments';
   static const String notifications = 'notifications_box';
   static const String companySettings = 'company_settings';
+  static const String visits = 'visits';
   static const String offlineQueue = 'offline_queue';
   static const String syncMeta = 'sync_meta';
 }
@@ -35,6 +36,7 @@ class HiveService {
       Hive.openBox<Map>(HiveBoxes.payments),
       Hive.openBox<Map>(HiveBoxes.notifications),
       Hive.openBox<Map>(HiveBoxes.companySettings),
+      Hive.openBox<Map>(HiveBoxes.visits),
       Hive.openBox<Map>(HiveBoxes.offlineQueue),
       Hive.openBox<String>(HiveBoxes.syncMeta),
     ]);

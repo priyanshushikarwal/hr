@@ -29,6 +29,7 @@ class ShellScreen extends ConsumerWidget {
       '/offer-letters': 'Offer Letters',
       '/attendance': 'Attendance',
       '/leave-requests': 'Leave Requests',
+      '/visits': 'Visit Tracking',
       '/payments': 'Salary Slip & Payments',
       '/reports': 'Reports',
       '/admin': 'Admin & Roles',
@@ -61,6 +62,8 @@ class ShellScreen extends ConsumerWidget {
         return 'Track employee attendance';
       case '/leave-requests':
         return 'Review and manage leave applications';
+      case '/visits':
+        return 'Track and verify employee visit selfies & locations';
       case '/payments':
         return 'Process salaries and payments';
       case '/reports':

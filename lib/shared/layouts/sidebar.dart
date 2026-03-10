@@ -64,6 +64,11 @@ const List<NavItem> sidebarItems = [
     route: '/leave-requests',
   ),
   NavItem(
+    label: 'Visit Tracking',
+    icon: AppIcons.location,
+    route: '/visits',
+  ),
+  NavItem(
     label: 'Salary Slip & Payments',
     icon: AppIcons.salarySlip,
     route: '/payments',

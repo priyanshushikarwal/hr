@@ -21,9 +21,10 @@ class AppwriteConfig {
   static const String offerLettersCollectionId = 'offer_letters';
   static const String companySettingsCollectionId = 'company_settings';
   static const String employeeDocumentsCollectionId = 'employee_documents';
+  static const String visitsCollectionId = 'visits';
 
   // ============ STORAGE BUCKETS ============
-  static const String visitSelfiesBucketId = 'visit_selfies';
+  static const String visitSelfiesBucketId = 'employee_documents';
   static const String companyAssetsBucketId = 'company_assets';
   static const String documentsBucketId = 'documents';
   static const String employeeDocumentsBucketId = 'employee_documents';

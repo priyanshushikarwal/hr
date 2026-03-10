@@ -13,6 +13,7 @@ import '../../features/salary/presentation/screens/factory_salary_screen.dart';
 import '../../features/offer_letter/presentation/screens/offer_letter_screen.dart';
 import '../../features/payments/presentation/screens/payments_screen.dart';
 import '../../features/leave/presentation/screens/leave_approval_screen.dart';
+import '../../features/visit/presentation/screens/visit_screen.dart';
 
 /// App Router Configuration using GoRouter with Auth Guards
 class AppRouter {
@@ -176,6 +177,17 @@ class AppRouter {
               pageBuilder: (context, state) => CustomTransitionPage(
                 key: state.pageKey,
                 child: const LeaveApprovalScreen(),
+                transitionsBuilder: _fadeTransition,
+              ),
+            ),
+
+            // Visit Tracking
+            GoRoute(
+              path: '/visits',
+              name: 'visits',
+              pageBuilder: (context, state) => CustomTransitionPage(
+                key: state.pageKey,
+                child: const VisitScreen(),
                 transitionsBuilder: _fadeTransition,
               ),
             ),

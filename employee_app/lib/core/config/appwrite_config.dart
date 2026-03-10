@@ -13,8 +13,9 @@ class AppwriteConfig {
   static const String leaveRequestsCollectionId = 'leave_requests';
   static const String notificationsCollectionId = 'notifications';
   static const String employeeDocumentsCollectionId = 'employee_documents';
+  static const String visitsCollectionId = 'visits';
 
   // Storage
-  static const String visitSelfiesBucketId = 'visit_selfies';
+  static const String visitSelfiesBucketId = 'employee_documents';
   static const String employeeDocumentsBucketId = 'employee_documents';
 }

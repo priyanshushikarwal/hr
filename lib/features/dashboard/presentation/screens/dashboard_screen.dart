@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/theme.dart';
 import '../../../../core/constants/app_icons.dart';
 import '../../../../core/widgets/stat_card.dart';
@@ -10,13 +11,22 @@ import '../../../../shared/layouts/header.dart';
 import '../../../../core/utils/dummy_data.dart';
 import '../../../../core/services/appwrite_service.dart';
 import '../widgets/dashboard_charts.dart';
+import '../../../employees/domain/providers/employee_providers.dart';
 
 /// Dashboard Screen - Main landing page after login
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final employeesState = ref.watch(employeeListProvider);
+    final employees = employeesState.employees;
+
+    final total = employees.length;
+    final officeCount = employees.where((e) => e.isOffice).length;
+    final factoryCount = employees.where((e) => e.isFactory).length;
+    final activeCount = employees.where((e) => e.isActive).length;
+
     return SingleChildScrollView(
       padding: AppSpacing.pagePadding,
       child: Column(
@@ -64,13 +74,47 @@ class DashboardScreen extends StatelessWidget {
 
           const SizedBox(height: AppSpacing.lg),
 
-          // Stats Row
-          _buildStatsSection(),
+          // Stats Row — DYNAMIC from real employee data
+          DashboardGrid(
+            columns: 4,
+            children: [
+              StatCard(
+                title: 'TOTAL EMPLOYEES',
+                value: total.toString(),
+                subtitle: '$activeCount active',
+                icon: AppIcons.employees,
+                iconColor: AppColors.primary,
+                trend: total > 0 ? '+$total' : '0',
+                isTrendPositive: total > 0,
+              ),
+              StatCard(
+                title: 'OFFICE EMPLOYEES',
+                value: officeCount.toString(),
+                subtitle: 'Regular staff',
+                icon: AppIcons.office,
+                iconColor: AppColors.secondary,
+              ),
+              StatCard(
+                title: 'FACTORY EMPLOYEES',
+                value: factoryCount.toString(),
+                subtitle: 'Production team',
+                icon: AppIcons.factory,
+                iconColor: AppColors.accent,
+              ),
+              StatCard(
+                title: 'PENDING APPROVALS',
+                value: '0',
+                subtitle: 'Requires action',
+                icon: AppIcons.pending,
+                iconColor: AppColors.warning,
+              ),
+            ],
+          ),
 
           const SizedBox(height: AppSpacing.sectionSpacing),
 
           // Charts Row
-          _buildChartsSection(),
+          _buildChartsSection(employees),
 
           const SizedBox(height: AppSpacing.sectionSpacing),
 
@@ -81,45 +125,13 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildStatsSection() {
-    return DashboardGrid(
-      columns: 4,
-      children: [
-        StatCard(
-          title: 'TOTAL EMPLOYEES',
-          value: DummyData.totalEmployees.toString(),
-          subtitle: '${DummyData.activeEmployees} active',
-          icon: AppIcons.employees,
-          iconColor: AppColors.primary,
-          trend: '+12%',
-          isTrendPositive: true,
-        ),
-        StatCard(
-          title: 'OFFICE EMPLOYEES',
-          value: DummyData.officeEmployees.toString(),
-          subtitle: 'Regular staff',
-          icon: AppIcons.office,
-          iconColor: AppColors.secondary,
-        ),
-        StatCard(
-          title: 'FACTORY EMPLOYEES',
-          value: DummyData.factoryEmployees.toString(),
-          subtitle: 'Production team',
-          icon: AppIcons.factory,
-          iconColor: AppColors.accent,
-        ),
-        StatCard(
-          title: 'PENDING APPROVALS',
-          value: DummyData.pendingApprovals.toString(),
-          subtitle: 'Requires action',
-          icon: AppIcons.pending,
-          iconColor: AppColors.warning,
-        ),
-      ],
-    );
-  }
+  Widget _buildChartsSection(List employees) {
+    // Build department distribution from real data
+    final deptMap = <String, int>{};
+    for (final emp in employees) {
+      deptMap[emp.department] = (deptMap[emp.department] ?? 0) + 1;
+    }
 
-  Widget _buildChartsSection() {
     return TwoColumnLayout(
       leftFlex: 3,
       rightFlex: 2,
@@ -145,20 +157,36 @@ class DashboardScreen extends StatelessWidget {
       right: Column(
         children: [
           // Quick Stats
-          _buildQuickStats(),
+          _buildQuickStats(employees),
           const SizedBox(height: AppSpacing.cardGap),
           // Department Distribution
           ContentCard(
             height: 320,
             title: 'Department Distribution',
-            child: DepartmentPieChart(data: DummyData.departmentDistribution),
+            child: deptMap.isNotEmpty
+                ? DepartmentPieChart(data: deptMap)
+                : Center(
+                    child: Text(
+                      'Add employees to see distribution',
+                      style: AppTypography.bodySmall.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildQuickStats() {
+  Widget _buildQuickStats(List employees) {
+    final pfPending = employees
+        .where((e) => e.isActive && !e.isPfApplicable)
+        .length;
+    final esicPending = employees
+        .where((e) => e.isActive && !e.isEsicApplicable)
+        .length;
+
     return ContentCard(
       title: 'This Month',
       child: Column(
@@ -166,28 +194,28 @@ class DashboardScreen extends StatelessWidget {
           _QuickStatItem(
             icon: AppIcons.money,
             label: 'Salary Processed',
-            value: '₹12.5L',
+            value: '₹0',
             color: AppColors.success,
           ),
           const Divider(height: 24),
           _QuickStatItem(
             icon: AppIcons.pf,
             label: 'PF Pending',
-            value: '${DummyData.pfPending} employees',
+            value: '$pfPending employees',
             color: AppColors.warning,
           ),
           const Divider(height: 24),
           _QuickStatItem(
             icon: AppIcons.esic,
             label: 'ESIC Pending',
-            value: '${DummyData.esicPending} employees',
+            value: '$esicPending employees',
             color: AppColors.error,
           ),
           const Divider(height: 24),
           _QuickStatItem(
             icon: AppIcons.attendance,
-            label: 'Avg Attendance',
-            value: '91.2%',
+            label: 'Total Employees',
+            value: '${employees.length}',
             color: AppColors.info,
           ),
         ],
@@ -251,23 +279,16 @@ class _QuickStatItem extends StatelessWidget {
     return Row(
       children: [
         Container(
-          padding: const EdgeInsets.all(10),
+          padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
             color: color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(icon, size: 20, color: color),
+          child: Icon(icon, size: 18, color: color),
         ),
-        const SizedBox(width: AppSpacing.md),
-        Expanded(
-          child: Text(
-            label,
-            style: AppTypography.bodyMedium.copyWith(
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ),
-        Text(value, style: AppTypography.titleSmall),
+        const SizedBox(width: 12),
+        Expanded(child: Text(label, style: AppTypography.labelMedium)),
+        Text(value, style: AppTypography.titleSmall.copyWith(color: color)),
       ],
     );
   }
@@ -286,6 +307,23 @@ class _ActivityItem extends StatelessWidget {
     required this.type,
   });
 
+  Color get _iconColor {
+    switch (type) {
+      case 'add':
+        return AppColors.success;
+      case 'payment':
+        return AppColors.primary;
+      case 'document':
+        return AppColors.info;
+      case 'approval':
+        return AppColors.warning;
+      case 'upload':
+        return AppColors.accent;
+      default:
+        return AppColors.textSecondary;
+    }
+  }
+
   IconData get _icon {
     switch (type) {
       case 'add':
@@ -295,28 +333,11 @@ class _ActivityItem extends StatelessWidget {
       case 'document':
         return AppIcons.offerLetter;
       case 'approval':
-        return AppIcons.approve;
+        return AppIcons.check;
       case 'upload':
         return AppIcons.upload;
       default:
         return AppIcons.info;
-    }
-  }
-
-  Color get _color {
-    switch (type) {
-      case 'add':
-        return AppColors.success;
-      case 'payment':
-        return AppColors.primary;
-      case 'document':
-        return AppColors.info;
-      case 'approval':
-        return AppColors.accent;
-      case 'upload':
-        return AppColors.secondary;
-      default:
-        return AppColors.textSecondary;
     }
   }
 
@@ -325,35 +346,33 @@ class _ActivityItem extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: _color.withOpacity(0.1),
+              color: _iconColor.withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(_icon, size: 16, color: _color),
+            child: Icon(_icon, size: 16, color: _iconColor),
           ),
-          const SizedBox(width: AppSpacing.md),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(action, style: AppTypography.labelLarge),
-                const SizedBox(height: 2),
-                Text(description, style: AppTypography.bodySmall),
+                Text(action, style: AppTypography.labelMedium),
+                Text(description, style: AppTypography.caption),
               ],
             ),
           ),
           Text(time, style: AppTypography.caption),
         ],
       ),
-    ).animate().fadeIn(delay: 100.ms).slideX(begin: -0.05, end: 0);
+    );
   }
 }
 
-class _TaskItem extends StatefulWidget {
+class _TaskItem extends StatelessWidget {
   final String title;
   final String description;
   final String priority;
@@ -366,90 +385,51 @@ class _TaskItem extends StatefulWidget {
     required this.dueDate,
   });
 
-  @override
-  State<_TaskItem> createState() => _TaskItemState();
-}
-
-class _TaskItemState extends State<_TaskItem> {
-  bool _isHovered = false;
-
   Color get _priorityColor {
-    switch (widget.priority) {
+    switch (priority) {
       case 'high':
         return AppColors.error;
       case 'medium':
         return AppColors.warning;
+      case 'low':
+        return AppColors.info;
       default:
-        return AppColors.textTertiary;
+        return AppColors.textSecondary;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      child: AnimatedContainer(
-        duration: AppSpacing.durationFast,
-        margin: const EdgeInsets.symmetric(vertical: 6),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: _isHovered
-              ? AppColors.backgroundSecondary
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: _isHovered ? AppColors.border : Colors.transparent,
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Container(
+            width: 4,
+            height: 36,
+            decoration: BoxDecoration(
+              color: _priorityColor,
+              borderRadius: BorderRadius.circular(2),
+            ),
           ),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 4,
-              height: 40,
-              decoration: BoxDecoration(
-                color: _priorityColor,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(widget.title, style: AppTypography.labelLarge),
-                  const SizedBox(height: 4),
-                  Text(widget.description, style: AppTypography.caption),
-                ],
-              ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  widget.dueDate,
-                  style: AppTypography.labelSmall.copyWith(
-                    color: widget.dueDate == 'Today'
-                        ? AppColors.error
-                        : AppColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                StatusBadge(
-                  label: widget.priority.toUpperCase(),
-                  type: widget.priority == 'high'
-                      ? StatusType.error
-                      : widget.priority == 'medium'
-                      ? StatusType.warning
-                      : StatusType.neutral,
-                  isSmall: true,
-                ),
+                Text(title, style: AppTypography.labelMedium),
+                Text(description, style: AppTypography.caption),
               ],
             ),
-          ],
-        ),
+          ),
+          TextBadge(
+            label: dueDate,
+            backgroundColor: _priorityColor.withOpacity(0.1),
+            textColor: _priorityColor,
+            isSmall: true,
+          ),
+        ],
       ),
-    ).animate().fadeIn(delay: 100.ms).slideX(begin: 0.05, end: 0);
+    );
   }
 }

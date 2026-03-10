@@ -8,12 +8,14 @@ import '../../../../core/widgets/buttons.dart';
 import '../../../../core/widgets/badges.dart';
 import '../../../../core/widgets/avatar.dart';
 import '../../../../core/widgets/inputs.dart';
+import '../../../../core/services/export_service.dart';
 import '../../../../shared/layouts/main_layout.dart';
 import '../../../../shared/layouts/header.dart';
 import '../../data/models/employee_model.dart';
 import '../../domain/providers/employee_providers.dart';
 import '../widgets/add_employee_drawer.dart';
 import '../widgets/employee_filters.dart';
+import '../widgets/employee_documents_dialog.dart';
 
 /// Employee Master Screen - Table view with all employees
 class EmployeeMasterScreen extends ConsumerStatefulWidget {
@@ -96,7 +98,39 @@ class _EmployeeMasterScreenState extends ConsumerState<EmployeeMasterScreen> {
                   SecondaryButton(
                     text: 'Export',
                     icon: AppIcons.export,
-                    onPressed: () {},
+                    onPressed: () async {
+                      final employees = ref
+                          .read(employeeListProvider)
+                          .employees;
+                      if (employees.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('No employees to export'),
+                          ),
+                        );
+                        return;
+                      }
+                      try {
+                        final path = await ExportService.instance
+                            .exportEmployees(
+                              employees.map((e) => e.toJson()).toList(),
+                            );
+                        if (path != null && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Exported to: $path')),
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Export error: $e'),
+                              backgroundColor: AppColors.error,
+                            ),
+                          );
+                        }
+                      }
+                    },
                   ),
                   const SizedBox(width: AppSpacing.sm),
                   PrimaryButton(
@@ -155,12 +189,12 @@ class _EmployeeMasterScreenState extends ConsumerState<EmployeeMasterScreen> {
         if (_showAddDrawer)
           AddEmployeeDrawer(
             onClose: () => setState(() => _showAddDrawer = false),
-            onSave: (employee) async {
+            onSave: (employee, password) async {
               setState(() => _showAddDrawer = false);
               try {
                 await ref
                     .read(employeeListProvider.notifier)
-                    .createEmployee(employee);
+                    .createEmployee(employee, password: password);
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
@@ -189,14 +223,10 @@ class _EmployeeMasterScreenState extends ConsumerState<EmployeeMasterScreen> {
     final employees = employeeState.employees;
 
     final total = employees.length;
-    final officeCount = employees
-        .where((e) => e.employeeType == 'Office')
-        .length;
-    final factoryCount = employees
-        .where((e) => e.employeeType == 'Factory')
-        .length;
-    final activeCount = employees.where((e) => e.status == 'Active').length;
-    final inactiveCount = employees.where((e) => e.status == 'Inactive').length;
+    final officeCount = employees.where((e) => e.isOffice).length;
+    final factoryCount = employees.where((e) => e.isFactory).length;
+    final activeCount = employees.where((e) => e.isActive).length;
+    final inactiveCount = employees.where((e) => !e.isActive).length;
 
     return Row(
       children: [
@@ -305,7 +335,39 @@ class _EmployeeMasterScreenState extends ConsumerState<EmployeeMasterScreen> {
                     text: 'Export',
                     icon: AppIcons.export,
                     color: AppColors.primary,
-                    onPressed: () {},
+                    onPressed: () async {
+                      final allEmployees = ref
+                          .read(employeeListProvider)
+                          .employees;
+                      final selected = allEmployees
+                          .where((e) => _selectedIds.contains(e.id))
+                          .toList();
+                      if (selected.isEmpty) return;
+                      try {
+                        final path = await ExportService.instance
+                            .exportEmployees(
+                              selected.map((e) => e.toJson()).toList(),
+                            );
+                        if (path != null && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Exported ${selected.length} employees to: $path',
+                              ),
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Export error: $e'),
+                              backgroundColor: AppColors.error,
+                            ),
+                          );
+                        }
+                      }
+                    },
                   ),
                   const SizedBox(width: 8),
                   GhostButton(
@@ -488,7 +550,7 @@ class _EmployeeMasterScreenState extends ConsumerState<EmployeeMasterScreen> {
             DataCell(
               StatusBadge(
                 label: employee.status.toUpperCase(),
-                type: employee.status == 'active'
+                type: employee.isActive
                     ? StatusType.success
                     : StatusType.neutral,
                 isSmall: true,
@@ -511,7 +573,13 @@ class _EmployeeMasterScreenState extends ConsumerState<EmployeeMasterScreen> {
                     tooltip: 'View Details',
                     size: 32,
                     iconSize: 16,
-                    onPressed: () {},
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (ctx) =>
+                            EmployeeDocumentsDialog(employee: employee),
+                      );
+                    },
                   ),
                   AppIconButton(
                     icon: AppIcons.edit,

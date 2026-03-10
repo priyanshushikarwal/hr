@@ -1,108 +1,104 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/services/network_service.dart';
 import '../../data/models/leave_request_model.dart';
 import '../../data/repositories/leave_repository.dart';
 
-/// Leave Repository Provider
 final leaveRepositoryProvider = Provider<LeaveRepository>((ref) {
   return LeaveRepository();
 });
 
-/// Leave List State
 class LeaveListState {
   final List<LeaveRequest> requests;
   final bool isLoading;
   final String? error;
-  final int pendingCount;
 
   const LeaveListState({
     this.requests = const [],
     this.isLoading = false,
     this.error,
-    this.pendingCount = 0,
   });
 
   LeaveListState copyWith({
     List<LeaveRequest>? requests,
     bool? isLoading,
     String? error,
-    int? pendingCount,
   }) {
     return LeaveListState(
       requests: requests ?? this.requests,
       isLoading: isLoading ?? this.isLoading,
       error: error,
-      pendingCount: pendingCount ?? this.pendingCount,
     );
   }
+
+  int get pendingCount => requests.where((r) => r.status == 'pending').length;
+  int get approvedCount => requests.where((r) => r.status == 'approved').length;
+  int get rejectedCount => requests.where((r) => r.status == 'rejected').length;
 }
 
-/// Leave List Notifier
 class LeaveListNotifier extends StateNotifier<LeaveListState> {
   final LeaveRepository _repository;
+  final Ref _ref;
 
-  LeaveListNotifier(this._repository) : super(const LeaveListState()) {
-    loadLeaveRequests();
+  LeaveListNotifier(this._repository, this._ref)
+    : super(const LeaveListState()) {
+    loadRequests();
   }
 
-  Future<void> loadLeaveRequests({String? status, String? employeeId}) async {
+  bool get _isOnline =>
+      _ref.read(networkStatusProvider) == NetworkStatus.online;
+
+  Future<void> loadRequests({String? status, String? employeeId}) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final requests = await _repository.getLeaveRequests(
         status: status,
         employeeId: employeeId,
+        isOnline: _isOnline,
       );
-      final pendingCount = await _repository.getPendingCount();
-      state = LeaveListState(requests: requests, pendingCount: pendingCount);
+      state = LeaveListState(requests: requests);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
-  Future<bool> approveLeave(String documentId, String approvedBy) async {
+  Future<void> createRequest(LeaveRequest request) async {
     try {
-      await _repository.approveLeave(
-        documentId: documentId,
-        approvedBy: approvedBy,
-      );
-      await loadLeaveRequests();
-      return true;
+      await _repository.createLeaveRequest(request, isOnline: _isOnline);
+      await loadRequests();
     } catch (e) {
       state = state.copyWith(error: e.toString());
-      return false;
+      rethrow;
     }
   }
 
-  Future<bool> rejectLeave(
-    String documentId,
-    String rejectedBy, {
-    String? reason,
-  }) async {
+  Future<void> approve(String docId, String approvedBy) async {
     try {
-      await _repository.rejectLeave(
-        documentId: documentId,
-        rejectedBy: rejectedBy,
-        reason: reason,
-      );
-      await loadLeaveRequests();
-      return true;
+      await _repository.approveLeave(docId, approvedBy, isOnline: _isOnline);
+      await loadRequests();
     } catch (e) {
       state = state.copyWith(error: e.toString());
-      return false;
+      rethrow;
+    }
+  }
+
+  Future<void> reject(String docId, String rejectedBy, {String? reason}) async {
+    try {
+      await _repository.rejectLeave(
+        docId,
+        rejectedBy,
+        reason: reason,
+        isOnline: _isOnline,
+      );
+      await loadRequests();
+    } catch (e) {
+      state = state.copyWith(error: e.toString());
+      rethrow;
     }
   }
 }
 
-/// Leave List Provider
 final leaveListProvider =
     StateNotifierProvider<LeaveListNotifier, LeaveListState>((ref) {
-      final repository = ref.watch(leaveRepositoryProvider);
-      return LeaveListNotifier(repository);
+      final repo = ref.watch(leaveRepositoryProvider);
+      return LeaveListNotifier(repo, ref);
     });
-
-/// Pending Leave Count Provider
-final pendingLeaveCountProvider = Provider<int>((ref) {
-  return ref.watch(leaveListProvider).pendingCount;
-});
-
-/// Leave Filter Provider
-final leaveFilterProvider = StateProvider<String?>((ref) => null);

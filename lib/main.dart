@@ -4,11 +4,18 @@ import 'package:window_manager/window_manager.dart';
 import 'core/theme/app_theme.dart';
 import 'core/services/appwrite_service.dart';
 import 'core/services/realtime_service.dart';
+import 'core/services/sync_service.dart';
+import 'core/services/network_service.dart';
+import 'core/config/hive_config.dart';
+import 'core/widgets/offline_banner.dart';
 import 'features/auth/domain/providers/auth_providers.dart';
 import 'shared/navigation/app_router.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Hive (local storage)
+  await HiveService.initialize();
 
   // Initialize Appwrite
   AppwriteService.instance.initialize();
@@ -42,6 +49,8 @@ class HRMSApp extends ConsumerStatefulWidget {
 }
 
 class _HRMSAppState extends ConsumerState<HRMSApp> {
+  DateTime? _lastSyncTriggered;
+
   @override
   void initState() {
     super.initState();
@@ -67,6 +76,16 @@ class _HRMSAppState extends ConsumerState<HRMSApp> {
     // Subscribe/unsubscribe realtime based on auth state
     if (authState.isAuthenticated) {
       RealtimeService.instance.subscribeAll();
+      // Auto-sync when network comes back online (debounced — max once per 5 min)
+      final networkStatus = ref.watch(networkStatusProvider);
+      if (networkStatus == NetworkStatus.online) {
+        final now = DateTime.now();
+        if (_lastSyncTriggered == null ||
+            now.difference(_lastSyncTriggered!).inMinutes >= 5) {
+          _lastSyncTriggered = now;
+          SyncService.instance.syncAll();
+        }
+      }
     } else {
       RealtimeService.instance.unsubscribeAll();
     }
@@ -105,6 +124,8 @@ class _HRMSAppState extends ConsumerState<HRMSApp> {
           children: [
             // Custom Title Bar
             const _WindowTitleBar(),
+            // Offline Banner
+            const OfflineBanner(),
             // Main Content
             Expanded(child: child ?? const SizedBox.shrink()),
           ],

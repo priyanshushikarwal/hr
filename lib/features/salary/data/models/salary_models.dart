@@ -179,12 +179,11 @@ class OfficeSalaryStructure extends Equatable {
   }
 
   Map<String, dynamic> toJson() {
-    return {
+    final data = <String, dynamic>{
       'id': id,
       'employeeId': employeeId,
       'employeeCode': employeeCode,
       'effectiveFrom': effectiveFrom.toIso8601String(),
-      'effectiveTo': effectiveTo?.toIso8601String(),
       'basicSalary': basicSalary,
       'hra': hra,
       'da': da,
@@ -202,19 +201,26 @@ class OfficeSalaryStructure extends Equatable {
       'otherDeductions': otherDeductions,
       'isPfApplicable': isPfApplicable,
       'isEsicApplicable': isEsicApplicable,
-      'pfActivationDate': pfActivationDate?.toIso8601String(),
-      'esicActivationDate': esicActivationDate?.toIso8601String(),
       'totalDeductions': totalDeductions,
       'netSalary': netSalary,
       'ctc': ctc,
       'advanceBalance': advanceBalance,
       'loanBalance': loanBalance,
-      'remarks': remarks,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
-      'createdBy': createdBy,
-      'status': status,
     };
+
+    if (effectiveTo != null)
+      data['effectiveTo'] = effectiveTo!.toIso8601String();
+    if (pfActivationDate != null)
+      data['pfActivationDate'] = pfActivationDate!.toIso8601String();
+    if (esicActivationDate != null)
+      data['esicActivationDate'] = esicActivationDate!.toIso8601String();
+    if (remarks != null) data['remarks'] = remarks;
+    if (createdBy != null) data['createdBy'] = createdBy;
+    if (status != null) data['status'] = status;
+
+    return data;
   }
 
   factory OfficeSalaryStructure.fromJson(Map<String, dynamic> json) {

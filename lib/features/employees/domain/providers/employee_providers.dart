@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/services/network_service.dart';
 import '../../data/models/employee_model.dart';
 import '../../data/repositories/employee_repository.dart';
 
@@ -39,10 +40,15 @@ class EmployeeListState {
 /// Employee List Notifier
 class EmployeeListNotifier extends StateNotifier<EmployeeListState> {
   final EmployeeRepository _repository;
+  final Ref _ref;
 
-  EmployeeListNotifier(this._repository) : super(const EmployeeListState()) {
+  EmployeeListNotifier(this._repository, this._ref)
+    : super(const EmployeeListState()) {
     loadEmployees();
   }
+
+  bool get _isOnline =>
+      _ref.read(networkStatusProvider) == NetworkStatus.online;
 
   Future<void> loadEmployees({
     String? status,
@@ -57,6 +63,7 @@ class EmployeeListNotifier extends StateNotifier<EmployeeListState> {
         department: department,
         employeeType: employeeType,
         searchQuery: searchQuery,
+        isOnline: _isOnline,
       );
       state = EmployeeListState(
         employees: employees,
@@ -67,39 +74,47 @@ class EmployeeListNotifier extends StateNotifier<EmployeeListState> {
     }
   }
 
-  Future<void> createEmployee(Employee employee) async {
+  Future<void> createEmployee(Employee employee, {String? password}) async {
     try {
-      await _repository.createEmployee(employee);
+      await _repository.createEmployee(
+        employee,
+        isOnline: _isOnline,
+        password: password,
+      );
       await loadEmployees();
     } catch (e) {
       state = state.copyWith(error: e.toString());
+      rethrow;
     }
   }
 
   Future<void> updateEmployee(String docId, Map<String, dynamic> data) async {
     try {
-      await _repository.updateEmployee(docId, data);
+      await _repository.updateEmployee(docId, data, isOnline: _isOnline);
       await loadEmployees();
     } catch (e) {
       state = state.copyWith(error: e.toString());
+      rethrow;
     }
   }
 
   Future<void> deactivateEmployee(String docId) async {
     try {
-      await _repository.deactivateEmployee(docId);
+      await _repository.deactivateEmployee(docId, isOnline: _isOnline);
       await loadEmployees();
     } catch (e) {
       state = state.copyWith(error: e.toString());
+      rethrow;
     }
   }
 
   Future<void> deleteEmployee(String docId) async {
     try {
-      await _repository.deleteEmployee(docId);
+      await _repository.deleteEmployee(docId, isOnline: _isOnline);
       await loadEmployees();
     } catch (e) {
       state = state.copyWith(error: e.toString());
+      rethrow;
     }
   }
 }
@@ -108,7 +123,7 @@ class EmployeeListNotifier extends StateNotifier<EmployeeListState> {
 final employeeListProvider =
     StateNotifierProvider<EmployeeListNotifier, EmployeeListState>((ref) {
       final repository = ref.watch(employeeRepositoryProvider);
-      return EmployeeListNotifier(repository);
+      return EmployeeListNotifier(repository, ref);
     });
 
 /// Single Employee Provider
@@ -117,5 +132,6 @@ final employeeByIdProvider = FutureProvider.family<Employee?, String>((
   employeeId,
 ) async {
   final repository = ref.watch(employeeRepositoryProvider);
-  return await repository.getEmployeeById(employeeId);
+  final isOnline = ref.watch(networkStatusProvider) == NetworkStatus.online;
+  return await repository.getEmployeeById(employeeId, isOnline: isOnline);
 });

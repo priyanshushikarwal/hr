@@ -11,7 +11,6 @@ import '../../../../shared/layouts/header.dart';
 import '../../data/models/leave_request_model.dart';
 import '../../domain/providers/leave_providers.dart';
 import '../../../auth/domain/providers/auth_providers.dart';
-import '../../../notifications/data/repositories/notification_repository.dart';
 
 /// Leave Approval Screen for HR Desktop
 class LeaveApprovalScreen extends ConsumerStatefulWidget {
@@ -45,7 +44,7 @@ class _LeaveApprovalScreenState extends ConsumerState<LeaveApprovalScreen> {
                 text: 'Refresh',
                 icon: AppIcons.refresh,
                 onPressed: () {
-                  ref.read(leaveListProvider.notifier).loadLeaveRequests();
+                  ref.read(leaveListProvider.notifier).loadRequests();
                 },
               ),
             ],
@@ -294,30 +293,30 @@ class _LeaveApprovalScreenState extends ConsumerState<LeaveApprovalScreen> {
     );
 
     if (confirmed == true) {
-      final success = await ref
-          .read(leaveListProvider.notifier)
-          .approveLeave(request.id, user.userId);
+      try {
+        await ref
+            .read(leaveListProvider.notifier)
+            .approve(request.id, user.userId);
 
-      if (success && mounted) {
-        // Create notification for the employee
-        try {
-          final notifRepo = NotificationRepository();
-          await notifRepo.createNotification(
-            userId: request.employeeId,
-            title: 'Leave Approved',
-            message:
-                'Your leave request from ${DateFormat('dd MMM').format(request.fromDate)} to ${DateFormat('dd MMM').format(request.toDate)} has been approved.',
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Leave request approved successfully'),
+              backgroundColor: AppColors.success,
+            ),
           );
-        } catch (_) {
-          // Notification failure shouldn't block the approval
         }
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Leave request approved successfully'),
-            backgroundColor: AppColors.success,
-          ),
-        );
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Error: ${e.toString().replaceFirst('Exception: ', '')}',
+              ),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
       }
     }
   }
@@ -366,33 +365,36 @@ class _LeaveApprovalScreenState extends ConsumerState<LeaveApprovalScreen> {
     );
 
     if (confirmed == true) {
-      final success = await ref
-          .read(leaveListProvider.notifier)
-          .rejectLeave(
-            request.id,
-            user.userId,
-            reason: reasonController.text.trim().isNotEmpty
-                ? reasonController.text.trim()
-                : null,
-          );
+      try {
+        await ref
+            .read(leaveListProvider.notifier)
+            .reject(
+              request.id,
+              user.userId,
+              reason: reasonController.text.trim().isNotEmpty
+                  ? reasonController.text.trim()
+                  : null,
+            );
 
-      if (success && mounted) {
-        try {
-          final notifRepo = NotificationRepository();
-          await notifRepo.createNotification(
-            userId: request.employeeId,
-            title: 'Leave Rejected',
-            message:
-                'Your leave request from ${DateFormat('dd MMM').format(request.fromDate)} to ${DateFormat('dd MMM').format(request.toDate)} has been rejected.',
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Leave request rejected'),
+              backgroundColor: AppColors.error,
+            ),
           );
-        } catch (_) {}
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Leave request rejected'),
-            backgroundColor: AppColors.error,
-          ),
-        );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Error: ${e.toString().replaceFirst('Exception: ', '')}',
+              ),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
       }
     }
     reasonController.dispose();

@@ -21,8 +21,10 @@ class AttendanceRecord extends Equatable {
   final DateTime? shiftStartTime;
   final DateTime? shiftEndTime;
 
-  // Remarks
+  // Remarks & Tracking
   final String? remarks;
+  final String? selfieId;
+  final String? location;
 
   // Approval
   final bool isApproved;
@@ -49,6 +51,8 @@ class AttendanceRecord extends Equatable {
     this.shiftStartTime,
     this.shiftEndTime,
     this.remarks,
+    this.selfieId,
+    this.location,
     this.isApproved = false,
     this.approvedBy,
     this.approvedAt,
@@ -61,6 +65,7 @@ class AttendanceRecord extends Equatable {
   bool get isAbsent => status == 'absent';
   bool get isOnLeave => status == 'leave';
   bool get isHalfDay => status == 'half_day';
+  bool get isVisit => status == 'visit';
   bool get isHoliday => status == 'holiday';
   bool get isWeekend => status == 'weekend';
   bool get hasOvertime => overtimeHours > 0;
@@ -80,6 +85,8 @@ class AttendanceRecord extends Equatable {
     DateTime? shiftStartTime,
     DateTime? shiftEndTime,
     String? remarks,
+    String? selfieId,
+    String? location,
     bool? isApproved,
     String? approvedBy,
     DateTime? approvedAt,
@@ -102,6 +109,8 @@ class AttendanceRecord extends Equatable {
       shiftStartTime: shiftStartTime ?? this.shiftStartTime,
       shiftEndTime: shiftEndTime ?? this.shiftEndTime,
       remarks: remarks ?? this.remarks,
+      selfieId: selfieId ?? this.selfieId,
+      location: location ?? this.location,
       isApproved: isApproved ?? this.isApproved,
       approvedBy: approvedBy ?? this.approvedBy,
       approvedAt: approvedAt ?? this.approvedAt,
@@ -112,28 +121,28 @@ class AttendanceRecord extends Equatable {
   }
 
   Map<String, dynamic> toJson() {
-    return {
+    final data = <String, dynamic>{
       'id': id,
       'employeeId': employeeId,
       'employeeCode': employeeCode,
       'date': date.toIso8601String(),
       'status': status,
-      'leaveType': leaveType,
-      'checkIn': checkIn?.toIso8601String(),
-      'checkOut': checkOut?.toIso8601String(),
       'hoursWorked': hoursWorked,
       'overtimeHours': overtimeHours,
-      'shiftType': shiftType,
-      'shiftStartTime': shiftStartTime?.toIso8601String(),
-      'shiftEndTime': shiftEndTime?.toIso8601String(),
-      'remarks': remarks,
-      'isApproved': isApproved,
-      'approvedBy': approvedBy,
-      'approvedAt': approvedAt?.toIso8601String(),
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
-      'createdBy': createdBy,
     };
+
+    // Only include optional fields if they have values
+    if (checkIn != null) data['checkIn'] = checkIn!.toIso8601String();
+    if (checkOut != null) data['checkOut'] = checkOut!.toIso8601String();
+    if (remarks != null) data['remarks'] = remarks;
+    if (selfieId != null) data['selfieId'] = selfieId;
+    if (location != null) data['location'] = location;
+    if (approvedBy != null) data['approvedBy'] = approvedBy;
+    if (createdBy != null) data['createdBy'] = createdBy;
+
+    return data;
   }
 
   factory AttendanceRecord.fromJson(Map<String, dynamic> json) {
@@ -160,6 +169,8 @@ class AttendanceRecord extends Equatable {
           ? DateTime.parse(json['shiftEndTime'] as String)
           : null,
       remarks: json['remarks'] as String?,
+      selfieId: json['selfieId'] as String?,
+      location: json['location'] as String?,
       isApproved: json['isApproved'] as bool? ?? false,
       approvedBy: json['approvedBy'] as String?,
       approvedAt: json['approvedAt'] != null
@@ -187,6 +198,8 @@ class AttendanceRecord extends Equatable {
     shiftStartTime,
     shiftEndTime,
     remarks,
+    selfieId,
+    location,
     isApproved,
     approvedBy,
     approvedAt,

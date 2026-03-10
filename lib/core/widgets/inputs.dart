@@ -354,6 +354,7 @@ class AppDropdownField<T> extends StatelessWidget {
         ],
         DropdownButtonFormField<T>(
           value: value,
+          isExpanded: true,
           hint: hint != null
               ? Text(hint!, style: AppTypography.formHint)
               : null,
@@ -448,9 +449,17 @@ class AppDateField extends StatelessWidget {
         InkWell(
           onTap: enabled
               ? () async {
+                  final now = DateTime.now();
+                  DateTime initial = value ?? now;
+                  if (lastDate != null && initial.isAfter(lastDate!)) {
+                    initial = lastDate!;
+                  }
+                  if (firstDate != null && initial.isBefore(firstDate!)) {
+                    initial = firstDate!;
+                  }
                   final date = await showDatePicker(
                     context: context,
-                    initialDate: value ?? DateTime.now(),
+                    initialDate: initial,
                     firstDate: firstDate ?? DateTime(1950),
                     lastDate: lastDate ?? DateTime(2100),
                     builder: (context, child) {

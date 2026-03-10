@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/theme.dart';
 import '../../../../core/constants/app_icons.dart';
 import '../../../../core/widgets/buttons.dart';
@@ -8,60 +9,44 @@ import '../../../../core/widgets/avatar.dart';
 import '../../../../core/widgets/inputs.dart';
 import '../../../../shared/layouts/main_layout.dart';
 import '../../../../shared/layouts/header.dart';
+import '../../../employees/domain/providers/employee_providers.dart';
 
 /// Factory Salary Screen - Daily wage tracking for factory workers
-class FactorySalaryScreen extends StatefulWidget {
+class FactorySalaryScreen extends ConsumerStatefulWidget {
   const FactorySalaryScreen({super.key});
 
   @override
-  State<FactorySalaryScreen> createState() => _FactorySalaryScreenState();
+  ConsumerState<FactorySalaryScreen> createState() =>
+      _FactorySalaryScreenState();
 }
 
-class _FactorySalaryScreenState extends State<FactorySalaryScreen> {
+class _FactorySalaryScreenState extends ConsumerState<FactorySalaryScreen> {
   DateTime _selectedDate = DateTime.now();
   String? _selectedShift;
-  final List<_FactoryEntry> _entries = [
-    _FactoryEntry(
-      employeeId: 'EMP003',
-      name: 'Amit Patel',
-      department: 'Production',
-      hoursWorked: 8,
-      kva: 120,
-      rate: 15,
-      basicAmount: 1800,
-      ot: 2,
-      otAmount: 300,
-      total: 2100,
-    ),
-    _FactoryEntry(
-      employeeId: 'EMP005',
-      name: 'Vikram Singh',
-      department: 'Production',
-      hoursWorked: 8,
-      kva: 95,
-      rate: 12,
-      basicAmount: 1140,
-      ot: 0,
-      otAmount: 0,
-      total: 1140,
-    ),
-    _FactoryEntry(
-      employeeId: 'EMP009',
-      name: 'Suresh Yadav',
-      department: 'Maintenance',
-      hoursWorked: 8,
-      kva: 0,
-      rate: 0,
-      basicAmount: 800,
-      ot: 1,
-      otAmount: 100,
-      total: 900,
-      isDailyWage: true,
-    ),
-  ];
 
   @override
   Widget build(BuildContext context) {
+    final employeesState = ref.watch(employeeListProvider);
+    final factoryEmployees = employeesState.employees
+        .where((e) => e.isActive && e.isFactory)
+        .toList();
+
+    // Build entries from real factory employees
+    final entries = factoryEmployees.map((emp) {
+      return _FactoryEntry(
+        employeeId: emp.employeeCode,
+        name: emp.fullName,
+        department: emp.department,
+        hoursWorked: 0,
+        kva: 0,
+        rate: 0,
+        basicAmount: 0,
+        ot: 0,
+        otAmount: 0,
+        total: 0,
+      );
+    }).toList();
+
     return SingleChildScrollView(
       padding: AppSpacing.pagePadding,
       child: Column(
@@ -93,12 +78,44 @@ class _FactorySalaryScreenState extends State<FactorySalaryScreen> {
           const SizedBox(height: AppSpacing.lg),
 
           // Summary Cards
-          _buildSummaryCards(),
+          _buildSummaryCards(entries),
 
           const SizedBox(height: AppSpacing.lg),
 
-          // Daily Entries Table
-          _buildEntriesTable(),
+          if (employeesState.isLoading)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(48),
+                child: CircularProgressIndicator(),
+              ),
+            )
+          else if (factoryEmployees.isEmpty)
+            ContentCard(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(48),
+                  child: Column(
+                    children: [
+                      Icon(
+                        AppIcons.factory,
+                        size: 48,
+                        color: AppColors.textTertiary,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No factory employees found. Add factory employees first.',
+                        style: AppTypography.bodyMedium.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            )
+          else
+            // Daily Entries Table
+            _buildEntriesTable(entries),
         ],
       ),
     );
@@ -198,14 +215,11 @@ class _FactorySalaryScreenState extends State<FactorySalaryScreen> {
     );
   }
 
-  Widget _buildSummaryCards() {
-    final totalWorkers = _entries.length;
-    final totalHours = _entries.fold<double>(
-      0,
-      (sum, e) => sum + e.hoursWorked,
-    );
-    final totalKva = _entries.fold<double>(0, (sum, e) => sum + e.kva);
-    final totalAmount = _entries.fold<double>(0, (sum, e) => sum + e.total);
+  Widget _buildSummaryCards(List<_FactoryEntry> entries) {
+    final totalWorkers = entries.length;
+    final totalHours = entries.fold<double>(0, (sum, e) => sum + e.hoursWorked);
+    final totalKva = entries.fold<double>(0, (sum, e) => sum + e.kva);
+    final totalAmount = entries.fold<double>(0, (sum, e) => sum + e.total);
 
     return Row(
       children: [
@@ -240,7 +254,7 @@ class _FactorySalaryScreenState extends State<FactorySalaryScreen> {
     ).animate().fadeIn().slideY(begin: -0.1, end: 0);
   }
 
-  Widget _buildEntriesTable() {
+  Widget _buildEntriesTable(List<_FactoryEntry> entries) {
     return ContentCard(
       title: 'Daily Entries - ${_formatDate(_selectedDate)}',
       titleAction: Row(
@@ -282,8 +296,8 @@ class _FactorySalaryScreenState extends State<FactorySalaryScreen> {
           ),
 
           // Table Rows
-          ...List.generate(_entries.length, (index) {
-            final entry = _entries[index];
+          ...List.generate(entries.length, (index) {
+            final entry = entries[index];
             return _EntryRow(entry: entry);
           }),
 
@@ -472,15 +486,21 @@ class _EntryRowState extends State<_EntryRow> {
                 children: [
                   UserAvatar(name: widget.entry.name, size: 36),
                   const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(widget.entry.name, style: AppTypography.labelLarge),
-                      Text(
-                        '${widget.entry.employeeId} • ${widget.entry.department}',
-                        style: AppTypography.caption,
-                      ),
-                    ],
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.entry.name,
+                          style: AppTypography.labelLarge,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          '${widget.entry.employeeId} • ${widget.entry.department}',
+                          style: AppTypography.caption,
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import '../../../../core/theme/theme.dart';
 import '../../../../core/constants/app_icons.dart';
 import '../../../../core/widgets/buttons.dart';
@@ -8,78 +10,34 @@ import '../../../../core/widgets/avatar.dart';
 import '../../../../core/widgets/inputs.dart';
 import '../../../../shared/layouts/main_layout.dart';
 import '../../../../shared/layouts/header.dart';
+import '../../data/models/offer_letter_model.dart';
+import '../../domain/providers/offer_letter_providers.dart';
+import '../widgets/create_offer_letter_dialog.dart';
+import '../widgets/preview_offer_letter_dialog.dart';
+import '../utils/offer_letter_pdf_generator.dart';
 
-/// Offer Letter Screen - Create and manage offer letters
-class OfferLetterScreen extends StatefulWidget {
+/// Offer Letter Screen — Create and manage offer letters
+class OfferLetterScreen extends ConsumerStatefulWidget {
   const OfferLetterScreen({super.key});
 
   @override
-  State<OfferLetterScreen> createState() => _OfferLetterScreenState();
+  ConsumerState<OfferLetterScreen> createState() => _OfferLetterScreenState();
 }
 
-class _OfferLetterScreenState extends State<OfferLetterScreen> {
+class _OfferLetterScreenState extends ConsumerState<OfferLetterScreen> {
   String _currentTab = 'all';
 
-  final List<_OfferLetter> _offerLetters = [
-    _OfferLetter(
-      id: 'OL-2024-001',
-      candidateName: 'Ravi Teja',
-      position: 'Software Developer',
-      department: 'Engineering',
-      ctc: 850000,
-      joiningDate: DateTime(2024, 2, 1),
-      status: 'pending',
-      createdDate: DateTime(2024, 1, 20),
-    ),
-    _OfferLetter(
-      id: 'OL-2024-002',
-      candidateName: 'Meera Krishnan',
-      position: 'HR Executive',
-      department: 'Human Resources',
-      ctc: 450000,
-      joiningDate: DateTime(2024, 2, 15),
-      status: 'sent',
-      createdDate: DateTime(2024, 1, 18),
-    ),
-    _OfferLetter(
-      id: 'OL-2024-003',
-      candidateName: 'Arjun Reddy',
-      position: 'Production Operator',
-      department: 'Production',
-      ctc: 350000,
-      joiningDate: DateTime(2024, 1, 25),
-      status: 'accepted',
-      createdDate: DateTime(2024, 1, 10),
-    ),
-    _OfferLetter(
-      id: 'OL-2024-004',
-      candidateName: 'Sanya Malik',
-      position: 'Accounts Executive',
-      department: 'Finance',
-      ctc: 500000,
-      joiningDate: DateTime(2024, 3, 1),
-      status: 'draft',
-      createdDate: DateTime(2024, 1, 22),
-    ),
-    _OfferLetter(
-      id: 'OL-2023-025',
-      candidateName: 'Karan Singh',
-      position: 'Sales Executive',
-      department: 'Sales',
-      ctc: 400000,
-      joiningDate: DateTime(2023, 12, 15),
-      status: 'rejected',
-      createdDate: DateTime(2023, 12, 1),
-    ),
-  ];
-
-  List<_OfferLetter> get _filteredLetters {
-    if (_currentTab == 'all') return _offerLetters;
-    return _offerLetters.where((l) => l.status == _currentTab).toList();
+  List<OfferLetter> _getFiltered(List<OfferLetter> letters) {
+    if (_currentTab == 'all') return letters;
+    return letters.where((l) => l.status == _currentTab).toList();
   }
 
   @override
   Widget build(BuildContext context) {
+    final state = ref.watch(offerLetterProvider);
+    final allLetters = state.letters;
+    final filteredLetters = _getFiltered(allLetters);
+
     return SingleChildScrollView(
       padding: AppSpacing.pagePadding,
       child: Column(
@@ -91,74 +49,112 @@ class _OfferLetterScreenState extends State<OfferLetterScreen> {
             subtitle: 'Create and manage offer letters for new hires',
             breadcrumbs: const ['Home', 'Offer Letters'],
             actions: [
-              SecondaryButton(
-                text: 'Templates',
-                icon: AppIcons.template,
-                onPressed: () {},
-              ),
-              const SizedBox(width: AppSpacing.sm),
               PrimaryButton(
                 text: 'Create Offer Letter',
                 icon: AppIcons.add,
-                onPressed: () {},
+                onPressed: () async {
+                  final result = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => const CreateOfferLetterDialog(),
+                  );
+                  if (result == true) {
+                    ref.read(offerLetterProvider.notifier).loadOfferLetters();
+                  }
+                },
               ),
             ],
           ),
 
           // Stats Cards
-          _buildStatsCards(),
+          _buildStatsCards(allLetters),
 
           const SizedBox(height: AppSpacing.lg),
 
-          // Offer Letters List
-          ContentCard(
-            padding: EdgeInsets.zero,
-            child: Column(
-              children: [
-                // Tab Bar
-                _buildTabBar(),
+          if (state.isLoading)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(48),
+                child: CircularProgressIndicator(),
+              ),
+            )
+          else
+            // Offer Letters List
+            ContentCard(
+              padding: EdgeInsets.zero,
+              child: Column(
+                children: [
+                  // Tab Bar
+                  _buildTabBar(allLetters),
 
-                // List
-                ...List.generate(_filteredLetters.length, (index) {
-                  return _OfferLetterCard(offerLetter: _filteredLetters[index]);
-                }),
+                  // List
+                  ...List.generate(filteredLetters.length, (index) {
+                    return _OfferLetterCard(
+                      offerLetter: filteredLetters[index],
+                      onView: () => _showPreview(filteredLetters[index]),
+                      onEdit: () => _showEdit(filteredLetters[index]),
+                      onDownload: () => _downloadPdf(filteredLetters[index]),
+                    );
+                  }),
 
-                if (_filteredLetters.isEmpty)
-                  Container(
-                    padding: const EdgeInsets.all(48),
-                    child: Center(
-                      child: Column(
-                        children: [
-                          Icon(
-                            AppIcons.offerLetter,
-                            size: 48,
-                            color: AppColors.textTertiary,
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'No offer letters found',
-                            style: AppTypography.bodyMedium.copyWith(
-                              color: AppColors.textSecondary,
+                  if (filteredLetters.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(48),
+                      child: Center(
+                        child: Column(
+                          children: [
+                            Icon(
+                              AppIcons.offerLetter,
+                              size: 48,
+                              color: AppColors.textTertiary,
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 16),
+                            Text(
+                              allLetters.isEmpty
+                                  ? 'No offer letters yet. Click "Create Offer Letter" to get started.'
+                                  : 'No offer letters found for this filter.',
+                              style: AppTypography.bodyMedium.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-              ],
-            ),
-          ).animate().fadeIn(),
+                ],
+              ),
+            ).animate().fadeIn(),
         ],
       ),
     );
   }
 
-  Widget _buildStatsCards() {
-    final total = _offerLetters.length;
-    final pending = _offerLetters.where((l) => l.status == 'pending').length;
-    final sent = _offerLetters.where((l) => l.status == 'sent').length;
-    final accepted = _offerLetters.where((l) => l.status == 'accepted').length;
-    final rejected = _offerLetters.where((l) => l.status == 'rejected').length;
+  void _showPreview(OfferLetter letter) {
+    showDialog(
+      context: context,
+      builder: (context) => PreviewOfferLetterDialog(letter: letter),
+    );
+  }
+
+  void _showEdit(OfferLetter letter) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => CreateOfferLetterDialog(existingLetter: letter),
+    );
+    if (result == true) {
+      ref.read(offerLetterProvider.notifier).loadOfferLetters();
+    }
+  }
+
+  void _downloadPdf(OfferLetter letter) {
+    OfferLetterPdfGenerator.printPreview(letter);
+  }
+
+  Widget _buildStatsCards(List<OfferLetter> offerLetters) {
+    final total = offerLetters.length;
+    final draft = offerLetters.where((l) => l.isDraft).length;
+    final sent = offerLetters.where((l) => l.isSent).length;
+    final accepted = offerLetters.where((l) => l.isAccepted).length;
+    final rejected = offerLetters.where((l) => l.isRejected).length;
 
     return Row(
       children: [
@@ -170,9 +166,9 @@ class _OfferLetterScreenState extends State<OfferLetterScreen> {
         ),
         const SizedBox(width: AppSpacing.md),
         _StatCard(
-          label: 'Pending Approval',
-          value: pending.toString(),
-          icon: AppIcons.pending,
+          label: 'Draft',
+          value: draft.toString(),
+          icon: AppIcons.edit,
           color: AppColors.warning,
         ),
         const SizedBox(width: AppSpacing.md),
@@ -200,7 +196,7 @@ class _OfferLetterScreenState extends State<OfferLetterScreen> {
     ).animate().fadeIn().slideY(begin: -0.1, end: 0);
   }
 
-  Widget _buildTabBar() {
+  Widget _buildTabBar(List<OfferLetter> allLetters) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: const BoxDecoration(
@@ -210,36 +206,36 @@ class _OfferLetterScreenState extends State<OfferLetterScreen> {
         children: [
           _TabButton(
             label: 'All',
-            count: _offerLetters.length,
+            count: allLetters.length,
             isActive: _currentTab == 'all',
             onTap: () => setState(() => _currentTab = 'all'),
           ),
           _TabButton(
             label: 'Draft',
-            count: _offerLetters.where((l) => l.status == 'draft').length,
+            count: allLetters.where((l) => l.isDraft).length,
             isActive: _currentTab == 'draft',
             onTap: () => setState(() => _currentTab = 'draft'),
           ),
           _TabButton(
-            label: 'Pending',
-            count: _offerLetters.where((l) => l.status == 'pending').length,
-            isActive: _currentTab == 'pending',
-            onTap: () => setState(() => _currentTab = 'pending'),
+            label: 'Approved',
+            count: allLetters.where((l) => l.isApproved).length,
+            isActive: _currentTab == 'approved',
+            onTap: () => setState(() => _currentTab = 'approved'),
           ),
           _TabButton(
             label: 'Sent',
-            count: _offerLetters.where((l) => l.status == 'sent').length,
+            count: allLetters.where((l) => l.isSent).length,
             isActive: _currentTab == 'sent',
             onTap: () => setState(() => _currentTab = 'sent'),
           ),
           _TabButton(
             label: 'Accepted',
-            count: _offerLetters.where((l) => l.status == 'accepted').length,
+            count: allLetters.where((l) => l.isAccepted).length,
             isActive: _currentTab == 'accepted',
             onTap: () => setState(() => _currentTab = 'accepted'),
           ),
           const Spacer(),
-          AppSearchField(hint: 'Search by candidate name...', width: 250),
+          AppSearchField(hint: 'Search by name...', width: 250),
         ],
       ),
     );
@@ -375,9 +371,17 @@ class _TabButtonState extends State<_TabButton> {
 }
 
 class _OfferLetterCard extends StatefulWidget {
-  final _OfferLetter offerLetter;
+  final OfferLetter offerLetter;
+  final VoidCallback onView;
+  final VoidCallback onEdit;
+  final VoidCallback onDownload;
 
-  const _OfferLetterCard({required this.offerLetter});
+  const _OfferLetterCard({
+    required this.offerLetter,
+    required this.onView,
+    required this.onEdit,
+    required this.onDownload,
+  });
 
   @override
   State<_OfferLetterCard> createState() => _OfferLetterCardState();
@@ -390,10 +394,10 @@ class _OfferLetterCardState extends State<_OfferLetterCard> {
     switch (widget.offerLetter.status) {
       case 'draft':
         return StatusType.neutral;
-      case 'pending':
-        return StatusType.warning;
-      case 'sent':
+      case 'approved':
         return StatusType.info;
+      case 'sent':
+        return StatusType.warning;
       case 'accepted':
         return StatusType.success;
       case 'rejected':
@@ -407,10 +411,10 @@ class _OfferLetterCardState extends State<_OfferLetterCard> {
     switch (widget.offerLetter.status) {
       case 'draft':
         return 'Draft';
-      case 'pending':
-        return 'Pending Approval';
+      case 'approved':
+        return 'Approved';
       case 'sent':
-        return 'Sent to Candidate';
+        return 'Sent';
       case 'accepted':
         return 'Accepted';
       case 'rejected':
@@ -436,23 +440,29 @@ class _OfferLetterCardState extends State<_OfferLetterCard> {
         ),
         child: Row(
           children: [
-            // Candidate Info
+            // Employee Info
             Expanded(
               flex: 2,
               child: Row(
                 children: [
-                  UserAvatar(name: widget.offerLetter.candidateName, size: 44),
+                  UserAvatar(name: widget.offerLetter.employeeName, size: 44),
                   const SizedBox(width: 14),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.offerLetter.candidateName,
-                        style: AppTypography.titleSmall,
-                      ),
-                      const SizedBox(height: 2),
-                      Text(widget.offerLetter.id, style: AppTypography.caption),
-                    ],
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.offerLetter.employeeName,
+                          style: AppTypography.titleSmall,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          widget.offerLetter.employeeCode,
+                          style: AppTypography.caption,
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -465,8 +475,9 @@ class _OfferLetterCardState extends State<_OfferLetterCard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    widget.offerLetter.position,
+                    widget.offerLetter.designation,
                     style: AppTypography.labelLarge,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   Text(
                     widget.offerLetter.department,
@@ -479,7 +490,7 @@ class _OfferLetterCardState extends State<_OfferLetterCard> {
             // CTC
             Expanded(
               child: Text(
-                '₹${(widget.offerLetter.ctc / 100000).toStringAsFixed(1)} LPA',
+                '₹${widget.offerLetter.ctc.toInt()}/mo',
                 style: AppTypography.labelLarge,
               ),
             ),
@@ -487,7 +498,9 @@ class _OfferLetterCardState extends State<_OfferLetterCard> {
             // Joining Date
             Expanded(
               child: Text(
-                _formatDate(widget.offerLetter.joiningDate),
+                DateFormat(
+                  'dd MMM yyyy',
+                ).format(widget.offerLetter.joiningDate),
                 style: AppTypography.tableCell,
               ),
             ),
@@ -506,26 +519,23 @@ class _OfferLetterCardState extends State<_OfferLetterCard> {
                   AppIconButton(
                     icon: AppIcons.view,
                     tooltip: 'Preview',
-                    onPressed: () {},
+                    onPressed: widget.onView,
                   ),
                   AppIconButton(
                     icon: AppIcons.edit,
                     tooltip: 'Edit',
-                    onPressed: () {},
+                    onPressed: widget.onEdit,
                   ),
-                  if (widget.offerLetter.status == 'draft' ||
-                      widget.offerLetter.status == 'pending')
-                    AppIconButton(
-                      icon: AppIcons.send,
-                      tooltip: 'Send',
-                      color: AppColors.primary,
-                      onPressed: () {},
-                    ),
                   PopupMenuButton<String>(
                     icon: Icon(
                       AppIcons.moreVertical,
                       color: AppColors.textSecondary,
                     ),
+                    onSelected: (value) {
+                      if (value == 'download') {
+                        widget.onDownload();
+                      }
+                    },
                     itemBuilder: (context) => <PopupMenuEntry<String>>[
                       PopupMenuItem<String>(
                         value: 'download',
@@ -575,44 +585,4 @@ class _OfferLetterCardState extends State<_OfferLetterCard> {
       ),
     );
   }
-
-  String _formatDate(DateTime date) {
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    return '${date.day} ${months[date.month - 1]} ${date.year}';
-  }
-}
-
-class _OfferLetter {
-  final String id;
-  final String candidateName;
-  final String position;
-  final String department;
-  final double ctc;
-  final DateTime joiningDate;
-  final String status;
-  final DateTime createdDate;
-
-  const _OfferLetter({
-    required this.id,
-    required this.candidateName,
-    required this.position,
-    required this.department,
-    required this.ctc,
-    required this.joiningDate,
-    required this.status,
-    required this.createdDate,
-  });
 }

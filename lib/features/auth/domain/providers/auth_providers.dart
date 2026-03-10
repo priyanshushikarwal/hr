@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/services/sync_service.dart';
 import '../../data/models/user_model.dart';
 import '../../data/repositories/auth_repository.dart';
 
@@ -52,6 +53,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final user = await _repository.getCurrentUser();
       if (user != null && user.role.isDesktopAllowed) {
         state = AuthState(status: AuthStatus.authenticated, user: user);
+        // Sync data from Appwrite on session restore
+        SyncService.instance.syncAll();
       } else {
         state = const AuthState(status: AuthStatus.unauthenticated);
       }
@@ -79,6 +82,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
 
       state = AuthState(status: AuthStatus.authenticated, user: user);
+      // Sync data from Appwrite after login
+      SyncService.instance.syncAll();
     } catch (e) {
       state = AuthState(
         status: AuthStatus.error,

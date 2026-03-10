@@ -5,8 +5,8 @@ import '../../../../core/theme/theme.dart';
 import '../../../../core/constants/app_icons.dart';
 import '../../../../core/widgets/buttons.dart';
 import '../../../employees/data/models/employee_model.dart';
-import '../../data/repositories/attendance_repository.dart';
-import '../../../notifications/data/repositories/notification_repository.dart';
+import '../../data/models/attendance_models.dart';
+import '../../domain/providers/attendance_providers.dart';
 import '../../../auth/domain/providers/auth_providers.dart';
 
 /// Mark Attendance Dialog
@@ -114,7 +114,6 @@ class _MarkAttendanceDialogState extends ConsumerState<MarkAttendanceDialog> {
                 ),
               ],
             ),
-
             const SizedBox(height: 24),
             const Divider(),
             const SizedBox(height: 20),
@@ -124,6 +123,7 @@ class _MarkAttendanceDialogState extends ConsumerState<MarkAttendanceDialog> {
             const SizedBox(height: 8),
             DropdownButtonFormField<Employee>(
               value: _selectedEmployee,
+              isExpanded: true,
               decoration: InputDecoration(
                 hintText: 'Select employee',
                 prefixIcon: const Icon(AppIcons.user, size: 18),
@@ -137,12 +137,12 @@ class _MarkAttendanceDialogState extends ConsumerState<MarkAttendanceDialog> {
                   child: Text(
                     '${emp.employeeCode} - ${emp.fullName}',
                     style: AppTypography.bodyMedium,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 );
               }).toList(),
               onChanged: (val) => setState(() => _selectedEmployee = val),
             ),
-
             const SizedBox(height: 20),
 
             // Date Selector
@@ -180,7 +180,6 @@ class _MarkAttendanceDialogState extends ConsumerState<MarkAttendanceDialog> {
                 ),
               ),
             ),
-
             const SizedBox(height: 20),
 
             // Status Selector
@@ -242,7 +241,6 @@ class _MarkAttendanceDialogState extends ConsumerState<MarkAttendanceDialog> {
                 );
               }).toList(),
             ),
-
             const SizedBox(height: 20),
 
             // Remarks
@@ -258,10 +256,9 @@ class _MarkAttendanceDialogState extends ConsumerState<MarkAttendanceDialog> {
                 ),
               ),
             ),
-
             const SizedBox(height: 20),
 
-            // Error / Success
+            // Error / Success Messages
             if (_error != null)
               Container(
                 width: double.infinity,
@@ -278,7 +275,6 @@ class _MarkAttendanceDialogState extends ConsumerState<MarkAttendanceDialog> {
                   ),
                 ),
               ),
-
             if (_successMessage != null)
               Container(
                 width: double.infinity,
@@ -339,9 +335,7 @@ class _MarkAttendanceDialogState extends ConsumerState<MarkAttendanceDialog> {
       firstDate: DateTime(2020),
       lastDate: DateTime.now(),
     );
-    if (date != null) {
-      setState(() => _selectedDate = date);
-    }
+    if (date != null) setState(() => _selectedDate = date);
   }
 
   Future<void> _handleSubmit() async {
@@ -358,32 +352,26 @@ class _MarkAttendanceDialogState extends ConsumerState<MarkAttendanceDialog> {
 
     try {
       final user = ref.read(currentUserProvider);
-      final repo = AttendanceRepository();
+      final now = DateTime.now();
 
-      await repo.markAttendance(
+      final record = AttendanceRecord(
+        id: '',
         employeeId: _selectedEmployee!.id,
         employeeCode: _selectedEmployee!.employeeCode,
         date: _selectedDate,
         status: _selectedStatus,
-        remarks: _remarksController.text.trim(),
-        markedBy: user?.userId ?? 'hr',
+        hoursWorked: _selectedStatus == 'present'
+            ? 8.0
+            : (_selectedStatus == 'half_day' ? 4.0 : 0),
+        remarks: _remarksController.text.trim().isEmpty
+            ? null
+            : _remarksController.text.trim(),
+        createdAt: now,
+        updatedAt: now,
+        createdBy: user?.userId ?? 'hr',
       );
 
-      // Create notification for the employee
-      try {
-        final notifRepo = NotificationRepository();
-        final statusLabel = _statusOptions.firstWhere(
-          (s) => s['value'] == _selectedStatus,
-        )['label'];
-        await notifRepo.createNotification(
-          userId: _selectedEmployee!.id,
-          title: 'Attendance Updated',
-          message:
-              'Your attendance for ${DateFormat('dd MMM yyyy').format(_selectedDate)} has been marked as $statusLabel.',
-        );
-      } catch (_) {
-        // Notification failure shouldn't block attendance marking
-      }
+      await ref.read(attendanceProvider.notifier).markAttendance(record);
 
       setState(() {
         _isLoading = false;
@@ -391,7 +379,6 @@ class _MarkAttendanceDialogState extends ConsumerState<MarkAttendanceDialog> {
             'Attendance marked as ${_selectedStatus.replaceAll('_', ' ')} for ${_selectedEmployee!.fullName}';
       });
 
-      // Auto close after success
       await Future.delayed(const Duration(seconds: 2));
       if (mounted) Navigator.pop(context, true);
     } catch (e) {

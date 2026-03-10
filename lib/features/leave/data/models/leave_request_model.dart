@@ -93,6 +93,7 @@ class LeaveRequest extends Equatable {
 
   Map<String, dynamic> toJson() {
     return {
+      'id': id,
       'employeeId': employeeId,
       'employeeName': employeeName,
       'employeeCode': employeeCode,
@@ -103,6 +104,7 @@ class LeaveRequest extends Equatable {
       'approvedBy': approvedBy,
       'rejectionReason': rejectionReason,
       'createdAt': createdAt.toIso8601String(),
+      'updatedAt': DateTime.now().toIso8601String(),
     };
   }
 

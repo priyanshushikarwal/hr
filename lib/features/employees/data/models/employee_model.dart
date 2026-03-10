@@ -116,9 +116,9 @@ class Employee extends Equatable {
     return '$first$last';
   }
 
-  bool get isOffice => employeeType == 'office';
-  bool get isFactory => employeeType == 'factory';
-  bool get isActive => status == 'active';
+  bool get isOffice => employeeType.toLowerCase() == 'office';
+  bool get isFactory => employeeType.toLowerCase() == 'factory';
+  bool get isActive => status.toLowerCase() == 'active';
 
   Employee copyWith({
     String? id,

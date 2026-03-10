@@ -40,8 +40,8 @@ dependencies:
   
   # File & Document Handling
   file_picker: ^8.0.3
-  pdf: ^3.10.8
-  printing: ^5.12.0
+  pdf: ^3.11.3
+  printing: ^5.14.2
   
   # Backend
   appwrite: 21.1.0
@@ -61,6 +61,13 @@ dependencies:
   
   # Window Management (Desktop)
   window_manager: ^0.3.9
+  connectivity_plus: ^7.0.0
+  path_provider: ^2.1.5
+  open_file: ^3.5.11
+  excel: ^4.0.6
+  dart_appwrite: ^21.3.0
+  http: ^1.6.0
+  url_launcher: ^6.3.2
   
 dev_dependencies:
   flutter_test:

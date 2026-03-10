@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/theme.dart';
 import '../../../../core/constants/app_icons.dart';
 import '../../../../core/widgets/buttons.dart';
@@ -8,85 +9,81 @@ import '../../../../core/widgets/avatar.dart';
 import '../../../../core/widgets/inputs.dart';
 import '../../../../shared/layouts/main_layout.dart';
 import '../../../../shared/layouts/header.dart';
+import '../../../employees/data/models/employee_model.dart';
+import '../../../employees/domain/providers/employee_providers.dart';
+import '../../../salary/domain/providers/salary_providers.dart';
+import '../../../salary/data/models/salary_models.dart';
+import '../../../salary/data/repositories/salary_repository.dart';
+import '../../../salary/presentation/widgets/generate_salary_slip_dialog.dart';
+import '../../../../core/services/network_service.dart';
 
 /// Payments Screen - Salary slip generation and payment tracking
-class PaymentsScreen extends StatefulWidget {
+class PaymentsScreen extends ConsumerStatefulWidget {
   const PaymentsScreen({super.key});
 
   @override
-  State<PaymentsScreen> createState() => _PaymentsScreenState();
+  ConsumerState<PaymentsScreen> createState() => _PaymentsScreenState();
 }
 
-class _PaymentsScreenState extends State<PaymentsScreen> {
+class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
   DateTime _selectedMonth = DateTime.now();
   String _currentTab = 'all';
+  bool _isLoading = true;
+  Map<String, OfficeSalaryStructure> _salaryMap = {};
 
-  final List<_PaymentRecord> _payments = [
-    _PaymentRecord(
-      employeeId: 'EMP001',
-      name: 'Rajesh Kumar',
-      department: 'Engineering',
-      type: 'office',
-      grossSalary: 75000,
-      deductions: 12500,
-      netSalary: 62500,
-      status: 'paid',
-      paidDate: DateTime(2024, 1, 25),
-    ),
-    _PaymentRecord(
-      employeeId: 'EMP002',
-      name: 'Priya Sharma',
-      department: 'Human Resources',
-      type: 'office',
-      grossSalary: 65000,
-      deductions: 9800,
-      netSalary: 55200,
-      status: 'paid',
-      paidDate: DateTime(2024, 1, 25),
-    ),
-    _PaymentRecord(
-      employeeId: 'EMP003',
-      name: 'Amit Patel',
-      department: 'Production',
-      type: 'factory',
-      grossSalary: 28500,
-      deductions: 4275,
-      netSalary: 24225,
-      status: 'pending',
-    ),
-    _PaymentRecord(
-      employeeId: 'EMP004',
-      name: 'Sneha Reddy',
-      department: 'Finance',
-      type: 'office',
-      grossSalary: 55000,
-      deductions: 8250,
-      netSalary: 46750,
-      status: 'processing',
-    ),
-    _PaymentRecord(
-      employeeId: 'EMP005',
-      name: 'Vikram Singh',
-      department: 'Production',
-      type: 'factory',
-      grossSalary: 22000,
-      deductions: 1650,
-      netSalary: 20350,
-      status: 'pending',
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadSalaryData();
+  }
 
-  List<_PaymentRecord> get _filteredPayments {
-    if (_currentTab == 'all') return _payments;
-    if (_currentTab == 'office')
-      return _payments.where((p) => p.type == 'office').toList();
-    if (_currentTab == 'factory')
-      return _payments.where((p) => p.type == 'factory').toList();
-    return _payments.where((p) => p.status == _currentTab).toList();
+  Future<void> _loadSalaryData() async {
+    setState(() => _isLoading = true);
+    try {
+      final repo = ref.read(salaryRepositoryProvider);
+      final isOnline = ref.read(networkStatusProvider) == NetworkStatus.online;
+      final salaries = await repo.getAllOfficeSalaries(isOnline: isOnline);
+      final map = <String, OfficeSalaryStructure>{};
+      for (final s in salaries) {
+        map[s.employeeId] = s;
+      }
+      if (mounted) {
+        setState(() {
+          _salaryMap = map;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final employeesState = ref.watch(employeeListProvider);
+    final activeEmployees = employeesState.employees
+        .where((e) => e.isActive)
+        .toList();
+
+    // Build payment records from real employee + salary data
+    final payments = activeEmployees.map((emp) {
+      final salary = _salaryMap[emp.id];
+      return _PaymentRecord(
+        employee: emp,
+        employeeId: emp.employeeCode,
+        name: emp.fullName,
+        department: emp.department,
+        type: emp.employeeType.toLowerCase(),
+        grossSalary: salary?.grossSalary ?? 0,
+        deductions: salary?.totalDeductions ?? 0,
+        netSalary: salary?.netSalary ?? 0,
+        status: 'pending', // Will be determined by payment records
+        salary: salary,
+      );
+    }).toList();
+
+    final filteredPayments = _getFilteredPayments(payments);
+
     return SingleChildScrollView(
       padding: AppSpacing.pagePadding,
       child: Column(
@@ -99,38 +96,95 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
             breadcrumbs: const ['Home', 'Payments'],
             actions: [
               SecondaryButton(
-                text: 'Export Bank File',
-                icon: AppIcons.bank,
-                onPressed: () {},
+                text: 'Generate Salary Slip',
+                icon: AppIcons.download,
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (context) => const GenerateSalarySlipDialog(),
+                  );
+                },
               ),
               const SizedBox(width: AppSpacing.sm),
               PrimaryButton(
                 text: 'Process Salary',
                 icon: AppIcons.money,
                 useGradient: true,
-                onPressed: () => _showProcessSalaryDialog(context),
+                onPressed: () => _showProcessSalaryDialog(context, payments),
               ),
             ],
           ),
 
           // Month Selector and Stats
-          _buildMonthHeader(),
+          _buildMonthHeader(payments),
 
           const SizedBox(height: AppSpacing.lg),
 
           // Summary Cards
-          _buildSummaryCards(),
+          _buildSummaryCards(payments),
 
           const SizedBox(height: AppSpacing.lg),
 
-          // Payments Table
-          _buildPaymentsTable(),
+          // Loading state
+          if (employeesState.isLoading || _isLoading)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(48),
+                child: CircularProgressIndicator(),
+              ),
+            )
+          else if (activeEmployees.isEmpty)
+            ContentCard(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(48),
+                  child: Column(
+                    children: [
+                      Icon(
+                        AppIcons.money,
+                        size: 48,
+                        color: AppColors.textTertiary,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No employees found. Add employees first.',
+                        style: AppTypography.bodyMedium.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            )
+          else
+            // Payments Table
+            _buildPaymentsTable(payments, filteredPayments),
         ],
       ),
     );
   }
 
-  Widget _buildMonthHeader() {
+  List<_PaymentRecord> _getFilteredPayments(List<_PaymentRecord> payments) {
+    if (_currentTab == 'all') return payments;
+    if (_currentTab == 'office') {
+      return payments.where((p) => p.type == 'office').toList();
+    }
+    if (_currentTab == 'factory') {
+      return payments.where((p) => p.type == 'factory').toList();
+    }
+    if (_currentTab == 'has_salary') {
+      return payments.where((p) => p.grossSalary > 0).toList();
+    }
+    if (_currentTab == 'no_salary') {
+      return payments.where((p) => p.grossSalary == 0).toList();
+    }
+    return payments.where((p) => p.status == _currentTab).toList();
+  }
+
+  Widget _buildMonthHeader(List<_PaymentRecord> payments) {
+    final withSalary = payments.where((p) => p.grossSalary > 0).length;
+
     return ContentCard(
       child: Row(
         children: [
@@ -188,22 +242,19 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
           // Quick Stats
           _QuickStat(
             label: 'Total Employees',
-            value: _payments.length.toString(),
+            value: payments.length.toString(),
             color: AppColors.primary,
           ),
           const SizedBox(width: 24),
           _QuickStat(
-            label: 'Processed',
-            value: _payments.where((p) => p.status == 'paid').length.toString(),
+            label: 'With Salary',
+            value: withSalary.toString(),
             color: AppColors.success,
           ),
           const SizedBox(width: 24),
           _QuickStat(
-            label: 'Pending',
-            value: _payments
-                .where((p) => p.status == 'pending')
-                .length
-                .toString(),
+            label: 'No Salary Set',
+            value: (payments.length - withSalary).toString(),
             color: AppColors.warning,
           ),
         ],
@@ -211,19 +262,20 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
     );
   }
 
-  Widget _buildSummaryCards() {
-    final totalGross = _payments.fold<double>(
+  Widget _buildSummaryCards(List<_PaymentRecord> payments) {
+    final totalGross = payments.fold<double>(
       0,
       (sum, p) => sum + p.grossSalary,
     );
-    final totalDeductions = _payments.fold<double>(
+    final totalDeductions = payments.fold<double>(
       0,
       (sum, p) => sum + p.deductions,
     );
-    final totalNet = _payments.fold<double>(0, (sum, p) => sum + p.netSalary);
-    final paidAmount = _payments
-        .where((p) => p.status == 'paid')
-        .fold<double>(0, (sum, p) => sum + p.netSalary);
+    final totalNet = payments.fold<double>(0, (sum, p) => sum + p.netSalary);
+    final totalCTC = payments.fold<double>(
+      0,
+      (sum, p) => sum + (p.salary?.ctc ?? 0),
+    );
 
     return Row(
       children: [
@@ -240,30 +292,32 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
           value: '₹${_formatNumber(totalDeductions.toInt())}',
           icon: AppIcons.trendDown,
           color: AppColors.error,
-          subtitle: 'PF + ESIC + TDS + Others',
+          subtitle: 'PF + ESIC + Others',
         ),
         const SizedBox(width: AppSpacing.md),
         _SummaryCard(
           title: 'Total Net Payable',
           value: '₹${_formatNumber(totalNet.toInt())}',
           icon: AppIcons.wallet,
-          color: AppColors.info,
+          color: AppColors.success,
           subtitle: 'After deductions',
         ),
         const SizedBox(width: AppSpacing.md),
         _SummaryCard(
-          title: 'Paid',
-          value: '₹${_formatNumber(paidAmount.toInt())}',
-          icon: AppIcons.check,
-          color: AppColors.success,
-          subtitle:
-              '${_payments.where((p) => p.status == 'paid').length} employees',
+          title: 'Total CTC',
+          value: '₹${_formatNumber(totalCTC.toInt())}',
+          icon: AppIcons.money,
+          color: AppColors.info,
+          subtitle: 'Monthly cost to company',
         ),
       ],
     ).animate().fadeIn().slideY(begin: -0.1, end: 0);
   }
 
-  Widget _buildPaymentsTable() {
+  Widget _buildPaymentsTable(
+    List<_PaymentRecord> payments,
+    List<_PaymentRecord> filteredPayments,
+  ) {
     return ContentCard(
       padding: EdgeInsets.zero,
       child: Column(
@@ -276,26 +330,26 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
             ),
             child: Row(
               children: [
-                _TabChip('All', 'all', _payments.length),
+                _TabChip('All', 'all', payments.length),
                 _TabChip(
                   'Office',
                   'office',
-                  _payments.where((p) => p.type == 'office').length,
+                  payments.where((p) => p.type == 'office').length,
                 ),
                 _TabChip(
                   'Factory',
                   'factory',
-                  _payments.where((p) => p.type == 'factory').length,
+                  payments.where((p) => p.type == 'factory').length,
                 ),
                 _TabChip(
-                  'Paid',
-                  'paid',
-                  _payments.where((p) => p.status == 'paid').length,
+                  'Has Salary',
+                  'has_salary',
+                  payments.where((p) => p.grossSalary > 0).length,
                 ),
                 _TabChip(
-                  'Pending',
-                  'pending',
-                  _payments.where((p) => p.status == 'pending').length,
+                  'No Salary',
+                  'no_salary',
+                  payments.where((p) => p.grossSalary == 0).length,
                 ),
                 const Spacer(),
                 AppSearchField(hint: 'Search by name or ID...', width: 250),
@@ -322,9 +376,42 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
           ),
 
           // Table Rows
-          ...List.generate(_filteredPayments.length, (index) {
-            return _PaymentRow(payment: _filteredPayments[index]);
+          ...List.generate(filteredPayments.length, (index) {
+            return _PaymentRow(
+              payment: filteredPayments[index],
+              onGenerateSlip: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => GenerateSalarySlipDialog(
+                    preselectedEmployee: filteredPayments[index].employee,
+                  ),
+                );
+              },
+            );
           }),
+
+          if (filteredPayments.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(48),
+              child: Center(
+                child: Column(
+                  children: [
+                    Icon(
+                      AppIcons.salary,
+                      size: 48,
+                      color: AppColors.textTertiary,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No employees found for this filter.',
+                      style: AppTypography.bodyMedium.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     ).animate().fadeIn();
@@ -332,65 +419,240 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
 
   Widget _TabChip(String label, String tabId, int count) {
     final isActive = _currentTab == tabId;
-    return GestureDetector(
-      onTap: () => setState(() => _currentTab = tabId),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        margin: const EdgeInsets.only(right: 8),
-        decoration: BoxDecoration(
-          color: isActive ? AppColors.primarySurface : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isActive ? AppColors.primary : AppColors.border,
-          ),
-        ),
-        child: Row(
-          children: [
-            Text(
-              label,
-              style: AppTypography.labelMedium.copyWith(
-                color: isActive ? AppColors.primary : AppColors.textSecondary,
-              ),
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () => setState(() => _currentTab = tabId),
+        child: AnimatedContainer(
+          duration: AppSpacing.durationFast,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: isActive ? AppColors.primarySurface : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isActive ? AppColors.primary : Colors.transparent,
             ),
-            const SizedBox(width: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: isActive
-                    ? AppColors.primary
-                    : AppColors.backgroundSecondary,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                count.toString(),
-                style: AppTypography.labelSmall.copyWith(
-                  color: isActive ? Colors.white : AppColors.textSecondary,
-                  fontSize: 10,
+          ),
+          child: Row(
+            children: [
+              Text(
+                label,
+                style: AppTypography.labelMedium.copyWith(
+                  color: isActive ? AppColors.primary : AppColors.textSecondary,
                 ),
               ),
-            ),
-          ],
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: isActive
+                      ? AppColors.primary
+                      : AppColors.backgroundSecondary,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  count.toString(),
+                  style: AppTypography.labelSmall.copyWith(
+                    color: isActive ? Colors.white : AppColors.textSecondary,
+                    fontSize: 10,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  void _showProcessSalaryDialog(BuildContext context) {
+  void _showProcessSalaryDialog(
+    BuildContext context,
+    List<_PaymentRecord> payments,
+  ) {
+    final withSalary = payments.where((p) => p.grossSalary > 0).toList();
+    final totalNet = withSalary.fold<double>(0, (sum, p) => sum + p.netSalary);
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Process Salary'),
-        content: const Text(
-          'Salary processing dialog will be implemented here',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Container(
+          width: 550,
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      gradient: AppColors.primaryGradient,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      AppIcons.money,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Process Salary', style: AppTypography.titleLarge),
+                        Text(
+                          '${_getMonthName(_selectedMonth.month)} ${_selectedMonth.year}',
+                          style: AppTypography.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(AppIcons.close, size: 18),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              // Summary
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.backgroundSecondary,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Column(
+                  children: [
+                    _processRow('Total Employees', payments.length.toString()),
+                    const Divider(height: 16),
+                    _processRow(
+                      'With Salary Structure',
+                      withSalary.length.toString(),
+                    ),
+                    _processRow(
+                      'Without Salary Structure',
+                      (payments.length - withSalary.length).toString(),
+                      isWarning: true,
+                    ),
+                    const Divider(height: 16),
+                    _processRow(
+                      'Total Gross',
+                      '₹${_formatNumber(withSalary.fold<double>(0, (sum, p) => sum + p.grossSalary).toInt())}',
+                    ),
+                    _processRow(
+                      'Total Deductions',
+                      '-₹${_formatNumber(withSalary.fold<double>(0, (sum, p) => sum + p.deductions).toInt())}',
+                      isError: true,
+                    ),
+                    const Divider(height: 16),
+                    _processRow(
+                      'Total Net Payable',
+                      '₹${_formatNumber(totalNet.toInt())}',
+                      isBold: true,
+                      isSuccess: true,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              if (payments.length - withSalary.length > 0)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.warningSurface,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        AppIcons.warning,
+                        size: 18,
+                        color: AppColors.warningDark,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          '${payments.length - withSalary.length} employee(s) don\'t have a salary structure. Go to Office Salary screen to set up their salary.',
+                          style: AppTypography.bodySmall.copyWith(
+                            color: AppColors.warningDark,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: 24),
+
+              // Actions
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  SecondaryButton(
+                    text: 'Cancel',
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  const SizedBox(width: 12),
+                  PrimaryButton(
+                    text: 'Generate All Slips',
+                    icon: AppIcons.download,
+                    onPressed: withSalary.isEmpty
+                        ? null
+                        : () {
+                            Navigator.pop(context);
+                            ScaffoldMessenger.of(this.context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Salary slips generated for ${withSalary.length} employees!',
+                                ),
+                                backgroundColor: AppColors.success,
+                              ),
+                            );
+                          },
+                  ),
+                ],
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Process'),
+        ),
+      ),
+    );
+  }
+
+  Widget _processRow(
+    String label,
+    String value, {
+    bool isBold = false,
+    bool isWarning = false,
+    bool isError = false,
+    bool isSuccess = false,
+  }) {
+    Color? color;
+    if (isWarning) color = AppColors.warning;
+    if (isError) color = AppColors.error;
+    if (isSuccess) color = AppColors.success;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: isBold ? AppTypography.labelLarge : AppTypography.bodyMedium,
+          ),
+          Text(
+            value,
+            style:
+                (isBold ? AppTypography.titleSmall : AppTypography.labelLarge)
+                    .copyWith(color: color),
           ),
         ],
       ),
@@ -416,9 +678,6 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
   }
 
   String _formatNumber(int number) {
-    if (number >= 100000) {
-      return '${(number / 100000).toStringAsFixed(1)}L';
-    }
     return number.toString().replaceAllMapped(
       RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
       (m) => '${m[1]},',
@@ -440,11 +699,10 @@ class _QuickStat extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.end,
       children: [
+        Text(value, style: AppTypography.titleSmall.copyWith(color: color)),
         Text(label, style: AppTypography.caption),
-        const SizedBox(height: 2),
-        Text(value, style: AppTypography.titleLarge.copyWith(color: color)),
       ],
     );
   }
@@ -453,16 +711,16 @@ class _QuickStat extends StatelessWidget {
 class _SummaryCard extends StatelessWidget {
   final String title;
   final String value;
-  final String subtitle;
   final IconData icon;
   final Color color;
+  final String subtitle;
 
   const _SummaryCard({
     required this.title,
     required this.value,
-    required this.subtitle,
     required this.icon,
     required this.color,
+    required this.subtitle,
   });
 
   @override
@@ -489,7 +747,6 @@ class _SummaryCard extends StatelessWidget {
                   child: Icon(icon, size: 20, color: color),
                 ),
                 const Spacer(),
-                Text(title, style: AppTypography.caption),
               ],
             ),
             const SizedBox(height: 16),
@@ -498,6 +755,7 @@ class _SummaryCard extends StatelessWidget {
               style: AppTypography.headlineSmall.copyWith(color: color),
             ),
             const SizedBox(height: 4),
+            Text(title, style: AppTypography.labelMedium),
             Text(subtitle, style: AppTypography.caption),
           ],
         ),
@@ -523,8 +781,9 @@ class _TableHeader extends StatelessWidget {
 
 class _PaymentRow extends StatefulWidget {
   final _PaymentRecord payment;
+  final VoidCallback onGenerateSlip;
 
-  const _PaymentRow({required this.payment});
+  const _PaymentRow({required this.payment, required this.onGenerateSlip});
 
   @override
   State<_PaymentRow> createState() => _PaymentRowState();
@@ -533,30 +792,14 @@ class _PaymentRow extends StatefulWidget {
 class _PaymentRowState extends State<_PaymentRow> {
   bool _isHovered = false;
 
-  StatusType get _statusType {
-    switch (widget.payment.status) {
-      case 'paid':
-        return StatusType.success;
-      case 'pending':
-        return StatusType.warning;
-      case 'processing':
-        return StatusType.info;
-      default:
-        return StatusType.neutral;
-    }
+  String get _statusLabel {
+    if (widget.payment.grossSalary == 0) return 'No Salary';
+    return 'Ready';
   }
 
-  String get _statusLabel {
-    switch (widget.payment.status) {
-      case 'paid':
-        return 'Paid';
-      case 'pending':
-        return 'Pending';
-      case 'processing':
-        return 'Processing';
-      default:
-        return widget.payment.status;
-    }
+  StatusType get _statusType {
+    if (widget.payment.grossSalary == 0) return StatusType.neutral;
+    return StatusType.success;
   }
 
   @override
@@ -582,18 +825,21 @@ class _PaymentRowState extends State<_PaymentRow> {
                 children: [
                   UserAvatar(name: widget.payment.name, size: 36),
                   const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.payment.name,
-                        style: AppTypography.labelLarge,
-                      ),
-                      Text(
-                        widget.payment.employeeId,
-                        style: AppTypography.caption,
-                      ),
-                    ],
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.payment.name,
+                          style: AppTypography.labelLarge,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          widget.payment.employeeId,
+                          style: AppTypography.caption,
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -603,6 +849,7 @@ class _PaymentRowState extends State<_PaymentRow> {
               child: Text(
                 widget.payment.department,
                 style: AppTypography.tableCell,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
             // Type
@@ -615,23 +862,31 @@ class _PaymentRowState extends State<_PaymentRow> {
             // Gross
             Expanded(
               child: Text(
-                '₹${_formatNumber(widget.payment.grossSalary.toInt())}',
+                widget.payment.grossSalary > 0
+                    ? '₹${_formatNumber(widget.payment.grossSalary.toInt())}'
+                    : '-',
                 style: AppTypography.tableCell,
               ),
             ),
             // Deductions
             Expanded(
               child: Text(
-                '₹${_formatNumber(widget.payment.deductions.toInt())}',
+                widget.payment.deductions > 0
+                    ? '₹${_formatNumber(widget.payment.deductions.toInt())}'
+                    : '-',
                 style: AppTypography.tableCell.copyWith(color: AppColors.error),
               ),
             ),
             // Net
             Expanded(
               child: Text(
-                '₹${_formatNumber(widget.payment.netSalary.toInt())}',
+                widget.payment.netSalary > 0
+                    ? '₹${_formatNumber(widget.payment.netSalary.toInt())}'
+                    : '-',
                 style: AppTypography.labelLarge.copyWith(
-                  color: AppColors.success,
+                  color: widget.payment.netSalary > 0
+                      ? AppColors.success
+                      : AppColors.textTertiary,
                 ),
               ),
             ),
@@ -649,23 +904,18 @@ class _PaymentRowState extends State<_PaymentRow> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  AppIconButton(
-                    icon: AppIcons.filePdf,
-                    tooltip: 'View Salary Slip',
-                    onPressed: () {},
-                  ),
-                  AppIconButton(
-                    icon: AppIcons.download,
-                    tooltip: 'Download',
-                    onPressed: () {},
-                  ),
-                  if (widget.payment.status == 'pending')
+                  if (widget.payment.grossSalary > 0) ...[
                     AppIconButton(
-                      icon: AppIcons.send,
-                      tooltip: 'Process Payment',
-                      color: AppColors.primary,
-                      onPressed: () {},
+                      icon: AppIcons.filePdf,
+                      tooltip: 'Generate Salary Slip',
+                      onPressed: widget.onGenerateSlip,
                     ),
+                    AppIconButton(
+                      icon: AppIcons.download,
+                      tooltip: 'Download',
+                      onPressed: widget.onGenerateSlip,
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -684,6 +934,7 @@ class _PaymentRowState extends State<_PaymentRow> {
 }
 
 class _PaymentRecord {
+  final Employee employee;
   final String employeeId;
   final String name;
   final String department;
@@ -692,9 +943,10 @@ class _PaymentRecord {
   final double deductions;
   final double netSalary;
   final String status;
-  final DateTime? paidDate;
+  final OfficeSalaryStructure? salary;
 
   const _PaymentRecord({
+    required this.employee,
     required this.employeeId,
     required this.name,
     required this.department,
@@ -703,6 +955,6 @@ class _PaymentRecord {
     required this.deductions,
     required this.netSalary,
     required this.status,
-    this.paidDate,
+    this.salary,
   });
 }

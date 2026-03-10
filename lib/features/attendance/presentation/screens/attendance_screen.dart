@@ -8,22 +8,64 @@ import '../../../../core/widgets/inputs.dart';
 import '../../../../shared/layouts/main_layout.dart';
 import '../../../../shared/layouts/header.dart';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../employees/domain/providers/employee_providers.dart';
+import '../../domain/providers/attendance_providers.dart';
+import '../../data/models/attendance_models.dart';
+import '../../../../core/config/appwrite_config.dart';
+import '../widgets/mark_attendance_dialog.dart';
+
 /// Attendance Screen with Calendar + Table hybrid view
-class AttendanceScreen extends StatefulWidget {
+class AttendanceScreen extends ConsumerStatefulWidget {
   const AttendanceScreen({super.key});
 
   @override
-  State<AttendanceScreen> createState() => _AttendanceScreenState();
+  ConsumerState<AttendanceScreen> createState() => _AttendanceScreenState();
 }
 
-class _AttendanceScreenState extends State<AttendanceScreen> {
+class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
   DateTime _selectedMonth = DateTime.now();
   String? _selectedEmployee;
   final List<String> _viewModes = ['Calendar', 'Table'];
   String _currentView = 'Calendar';
 
   @override
+  void initState() {
+    super.initState();
+    // Load attendance data on screen init
+    Future.microtask(() {
+      ref
+          .read(attendanceProvider.notifier)
+          .loadAttendance(
+            month: _selectedMonth.month,
+            year: _selectedMonth.year,
+          );
+    });
+  }
+
+  void _loadAttendance() {
+    String? empId;
+    if (_selectedEmployee != null && _selectedEmployee != 'All Employees') {
+      final employeesState = ref.read(employeeListProvider);
+      final match = employeesState.employees.where((e) {
+        final label = '${e.employeeCode} - ${e.firstName} ${e.lastName}';
+        return label == _selectedEmployee;
+      }).toList();
+      if (match.isNotEmpty) empId = match.first.id;
+    }
+    ref
+        .read(attendanceProvider.notifier)
+        .loadAttendance(
+          month: _selectedMonth.month,
+          year: _selectedMonth.year,
+          employeeId: empId,
+        );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final attendanceState = ref.watch(attendanceProvider);
+
     return SingleChildScrollView(
       padding: AppSpacing.pagePadding,
       child: Column(
@@ -44,7 +86,21 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               PrimaryButton(
                 text: 'Mark Attendance',
                 icon: AppIcons.add,
-                onPressed: () {},
+                onPressed: () async {
+                  final employees = ref
+                      .read(employeeListProvider)
+                      .employees
+                      .where((e) => e.isActive)
+                      .toList();
+                  final result = await showDialog<bool>(
+                    context: context,
+                    builder: (context) =>
+                        MarkAttendanceDialog(employees: employees),
+                  );
+                  if (result == true) {
+                    _loadAttendance();
+                  }
+                },
               ),
             ],
           ),
@@ -54,19 +110,49 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
           const SizedBox(height: AppSpacing.lg),
 
-          // Attendance Summary Cards
-          _buildSummaryCards(),
+          // Attendance Summary Cards — dynamic
+          _buildSummaryCards(attendanceState),
 
           const SizedBox(height: AppSpacing.lg),
 
-          // Calendar/Table View
-          _currentView == 'Calendar' ? _buildCalendarView() : _buildTableView(),
+          // Loading
+          if (attendanceState.isLoading)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(48),
+                child: CircularProgressIndicator(),
+              ),
+            )
+          else
+            // Calendar/Table View
+            _currentView == 'Calendar'
+                ? _buildCalendarView(attendanceState)
+                : _buildTableView(attendanceState),
         ],
       ),
     );
   }
 
   Widget _buildFiltersRow() {
+    final employeesState = ref.watch(employeeListProvider);
+    final activeEmployees = employeesState.employees
+        .where((e) => e.isActive)
+        .toList();
+
+    // Create dropdown items (All + active employees)
+    final dropdownItems = [
+      'All Employees',
+      ...activeEmployees.map(
+        (e) => '${e.employeeCode} - ${e.firstName} ${e.lastName}',
+      ),
+    ];
+
+    // Ensure selected value is valid or reset to All
+    if (_selectedEmployee != null &&
+        !dropdownItems.contains(_selectedEmployee)) {
+      _selectedEmployee = 'All Employees';
+    }
+
     return ContentCard(
       padding: const EdgeInsets.all(AppSpacing.md),
       child: Row(
@@ -76,15 +162,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             flex: 2,
             child: AppDropdownField<String>(
               hint: 'Select Employee',
-              value: _selectedEmployee,
-              items: const [
-                'All Employees',
-                'EMP001 - Rajesh Kumar',
-                'EMP002 - Priya Sharma',
-                'EMP003 - Amit Patel',
-              ],
+              value: _selectedEmployee ?? 'All Employees',
+              items: dropdownItems,
               itemLabel: (item) => item,
-              onChanged: (value) => setState(() => _selectedEmployee = value),
+              onChanged: (value) {
+                setState(() => _selectedEmployee = value);
+                _loadAttendance();
+              },
               prefixIcon: AppIcons.employees,
             ),
           ),
@@ -188,12 +272,33 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     );
   }
 
-  Widget _buildSummaryCards() {
+  Widget _buildSummaryCards(AttendanceState attendanceState) {
+    final records = attendanceState.records;
+    final daysInMonth = DateTime(
+      _selectedMonth.year,
+      _selectedMonth.month + 1,
+      0,
+    ).day;
+
+    // Count sundays in the month
+    int weekendCount = 0;
+    for (int d = 1; d <= daysInMonth; d++) {
+      final dt = DateTime(_selectedMonth.year, _selectedMonth.month, d);
+      if (dt.weekday == 7) weekendCount++; // Sunday
+    }
+    final workingDays = daysInMonth - weekendCount;
+
+    final presentCount = records.where((r) => r.isPresent).length;
+    final absentCount = records.where((r) => r.isAbsent).length;
+    final leaveCount = records.where((r) => r.isOnLeave).length;
+    final halfDayCount = records.where((r) => r.isHalfDay).length;
+    final totalOt = records.fold<double>(0, (sum, r) => sum + r.overtimeHours);
+
     return Row(
       children: [
         _AttendanceSummaryCard(
           title: 'Working Days',
-          value: '24',
+          value: workingDays.toString(),
           subtitle: 'This month',
           icon: AppIcons.calendarDays,
           color: AppColors.primary,
@@ -201,31 +306,37 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         const SizedBox(width: AppSpacing.md),
         _AttendanceSummaryCard(
           title: 'Present',
-          value: '22',
-          subtitle: '91.7%',
+          value: presentCount.toString(),
+          subtitle: workingDays > 0
+              ? '${(presentCount / workingDays * 100).toStringAsFixed(1)}%'
+              : '0%',
           icon: AppIcons.active,
           color: AppColors.success,
         ),
         const SizedBox(width: AppSpacing.md),
         _AttendanceSummaryCard(
           title: 'Absent',
-          value: '2',
-          subtitle: '8.3%',
+          value: absentCount.toString(),
+          subtitle: workingDays > 0
+              ? '${(absentCount / workingDays * 100).toStringAsFixed(1)}%'
+              : '0%',
           icon: AppIcons.xCircle,
           color: AppColors.error,
         ),
         const SizedBox(width: AppSpacing.md),
         _AttendanceSummaryCard(
           title: 'Leaves',
-          value: '3',
-          subtitle: 'Approved',
+          value: '${leaveCount + halfDayCount}',
+          subtitle: halfDayCount > 0
+              ? '$leaveCount full + $halfDayCount half'
+              : 'Approved',
           icon: AppIcons.calendar,
           color: AppColors.warning,
         ),
         const SizedBox(width: AppSpacing.md),
         _AttendanceSummaryCard(
           title: 'OT Hours',
-          value: '12',
+          value: totalOt.toStringAsFixed(0),
           subtitle: 'Total',
           icon: AppIcons.clock,
           color: AppColors.info,
@@ -234,7 +345,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     ).animate().fadeIn().slideY(begin: -0.1, end: 0);
   }
 
-  Widget _buildCalendarView() {
+  Widget _buildCalendarView(AttendanceState attendanceState) {
     final daysInMonth = DateTime(
       _selectedMonth.year,
       _selectedMonth.month + 1,
@@ -246,6 +357,15 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       1,
     );
     final startWeekday = firstDayOfMonth.weekday;
+
+    // Build a map of date -> status from real records
+    final statusMap = <int, String>{};
+    for (final record in attendanceState.records) {
+      if (record.date.month == _selectedMonth.month &&
+          record.date.year == _selectedMonth.year) {
+        statusMap[record.date.day] = record.status;
+      }
+    }
 
     return ContentCard(
       title: 'Monthly Calendar',
@@ -267,6 +387,11 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 _LegendItem(
                   color: AppColors.textTertiary,
                   label: 'Weekend/Holiday',
+                ),
+                const SizedBox(width: 16),
+                _LegendItem(
+                  color: AppColors.backgroundSecondary,
+                  label: 'Not Marked',
                 ),
               ],
             ),
@@ -310,18 +435,19 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 _selectedMonth.month,
                 dayNumber,
               );
-              final isWeekend = date.weekday == 6 || date.weekday == 7;
+              final isSunday = date.weekday == 7;
+              final isFuture = date.isAfter(DateTime.now());
 
-              // Dummy status
-              String status = 'present';
-              if (isWeekend) {
+              // Get real status from attendance records or show blank
+              String status;
+              if (isSunday) {
                 status = 'weekend';
-              } else if (dayNumber == 5 || dayNumber == 12) {
-                status = 'absent';
-              } else if (dayNumber == 8) {
-                status = 'leave';
-              } else if (dayNumber == 15) {
-                status = 'half_day';
+              } else if (statusMap.containsKey(dayNumber)) {
+                status = statusMap[dayNumber]!;
+              } else if (isFuture) {
+                status = 'future'; // future dates — blank
+              } else {
+                status = 'not_marked'; // past dates with no record
               }
 
               return _CalendarCell(
@@ -329,7 +455,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 status: status,
                 isToday:
                     date.day == DateTime.now().day &&
-                    date.month == DateTime.now().month,
+                    date.month == DateTime.now().month &&
+                    date.year == DateTime.now().year,
               );
             },
           ),
@@ -338,33 +465,75 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     ).animate().fadeIn();
   }
 
-  Widget _buildTableView() {
+  Widget _buildTableView(AttendanceState attendanceState) {
+    final daysInMonth = DateTime(
+      _selectedMonth.year,
+      _selectedMonth.month + 1,
+      0,
+    ).day;
+
+    // Build a map of day -> record
+    final recordMap = <int, AttendanceRecord>{};
+    for (final record in attendanceState.records) {
+      if (record.date.month == _selectedMonth.month &&
+          record.date.year == _selectedMonth.year) {
+        recordMap[record.date.day] = record;
+      }
+    }
+
     return ContentCard(
       title: 'Attendance Details',
       padding: EdgeInsets.zero,
       child: SizedBox(
         height: 500,
         child: ListView.builder(
-          itemCount: 15,
+          itemCount: daysInMonth,
           itemBuilder: (context, index) {
+            final dayNumber = index + 1;
+            final date = DateTime(
+              _selectedMonth.year,
+              _selectedMonth.month,
+              dayNumber,
+            );
+            final isSunday = date.weekday == 7;
+            final record = recordMap[dayNumber];
+            final isFuture = date.isAfter(DateTime.now());
+
+            String status;
+            if (isSunday) {
+              status = 'weekend';
+            } else if (record != null) {
+              status = record.status;
+            } else if (isFuture) {
+              status = 'future';
+            } else {
+              status = 'not_marked';
+            }
+
             return _AttendanceRow(
-              date: DateTime(
-                _selectedMonth.year,
-                _selectedMonth.month,
-                index + 1,
-              ),
-              status: index == 4
-                  ? 'absent'
-                  : (index == 7 ? 'leave' : 'present'),
-              checkIn: index == 4 ? null : '09:30 AM',
-              checkOut: index == 4 ? null : '06:45 PM',
-              hours: index == 4 ? 0 : 8.5,
-              ot: index % 3 == 0 ? 2 : 0,
+              date: date,
+              status: status,
+              checkIn: record?.checkIn != null
+                  ? _formatTime(record!.checkIn!)
+                  : null,
+              checkOut: record?.checkOut != null
+                  ? _formatTime(record!.checkOut!)
+                  : null,
+              hours: record?.hoursWorked ?? 0,
+              ot: record?.overtimeHours ?? 0,
+              selfieId: record?.selfieId,
+              location: record?.location,
             );
           },
         ),
       ),
     ).animate().fadeIn();
+  }
+
+  String _formatTime(DateTime time) {
+    final hour = time.hour > 12 ? time.hour - 12 : time.hour;
+    final period = time.hour >= 12 ? 'PM' : 'AM';
+    return '${hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')} $period';
   }
 
   void _showMonthPicker() async {
@@ -377,6 +546,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     );
     if (date != null) {
       setState(() => _selectedMonth = date);
+      _loadAttendance();
     }
   }
 
@@ -489,6 +659,10 @@ class _CalendarCellState extends State<_CalendarCell> {
         return AppColors.secondarySurface;
       case 'weekend':
         return AppColors.backgroundSecondary;
+      case 'not_marked':
+        return AppColors.cardBackground;
+      case 'future':
+        return AppColors.cardBackground;
       default:
         return AppColors.cardBackground;
     }
@@ -505,6 +679,10 @@ class _CalendarCellState extends State<_CalendarCell> {
       case 'half_day':
         return AppColors.secondaryDark;
       case 'weekend':
+        return AppColors.textTertiary;
+      case 'not_marked':
+        return AppColors.textSecondary;
+      case 'future':
         return AppColors.textTertiary;
       default:
         return AppColors.textPrimary;
@@ -524,7 +702,12 @@ class _CalendarCellState extends State<_CalendarCell> {
           borderRadius: BorderRadius.circular(8),
           border: widget.isToday
               ? Border.all(color: AppColors.primary, width: 2)
-              : null,
+              : (widget.status == 'not_marked'
+                    ? Border.all(
+                        color: AppColors.border.withOpacity(0.5),
+                        width: 1,
+                      )
+                    : null),
         ),
         child: Stack(
           children: [
@@ -539,14 +722,14 @@ class _CalendarCellState extends State<_CalendarCell> {
                 ),
               ),
             ),
-            if (widget.status == 'present' && widget.status != 'weekend')
+            if (widget.status == 'present')
               Positioned(
                 top: 4,
                 right: 4,
                 child: Container(
                   width: 6,
                   height: 6,
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     color: AppColors.success,
                     shape: BoxShape.circle,
                   ),
@@ -593,6 +776,8 @@ class _AttendanceRow extends StatelessWidget {
   final String? checkOut;
   final double hours;
   final double ot;
+  final String? selfieId;
+  final String? location;
 
   const _AttendanceRow({
     required this.date,
@@ -601,7 +786,53 @@ class _AttendanceRow extends StatelessWidget {
     this.checkOut,
     this.hours = 0,
     this.ot = 0,
+    this.selfieId,
+    this.location,
   });
+
+  String get _statusLabel {
+    switch (status) {
+      case 'present':
+        return 'Present';
+      case 'absent':
+        return 'Absent';
+      case 'leave':
+        return 'Leave';
+      case 'half_day':
+        return 'Half Day';
+      case 'visit':
+        return 'Visit';
+      case 'weekend':
+        return 'Weekend';
+      case 'not_marked':
+        return 'Not Marked';
+      case 'future':
+        return '-';
+      default:
+        return status;
+    }
+  }
+
+  StatusType get _statusType {
+    switch (status) {
+      case 'present':
+        return StatusType.success;
+      case 'absent':
+        return StatusType.error;
+      case 'leave':
+        return StatusType.warning;
+      case 'half_day':
+        return StatusType.info;
+      case 'visit':
+        return StatusType.info;
+      case 'weekend':
+        return StatusType.neutral;
+      case 'not_marked':
+        return StatusType.neutral;
+      default:
+        return StatusType.neutral;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -631,14 +862,10 @@ class _AttendanceRow extends StatelessWidget {
 
           // Status
           SizedBox(
-            width: 100,
+            width: 110,
             child: StatusBadge(
-              label: status == 'present'
-                  ? 'Present'
-                  : (status == 'leave' ? 'Leave' : 'Absent'),
-              type: status == 'present'
-                  ? StatusType.success
-                  : (status == 'leave' ? StatusType.warning : StatusType.error),
+              label: _statusLabel,
+              type: _statusType,
               isSmall: true,
             ),
           ),
@@ -697,17 +924,110 @@ class _AttendanceRow extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                AppIconButton(
-                  icon: AppIcons.edit,
-                  tooltip: 'Edit',
-                  size: 28,
-                  iconSize: 14,
-                  onPressed: () {},
-                ),
+                if (status == 'visit' && selfieId != null)
+                  MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: GestureDetector(
+                      onTap: () => _showVisitDetails(context),
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: AppColors.infoSurface,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Icon(
+                          Icons.camera_alt_outlined,
+                          size: 16,
+                          color: AppColors.infoDark,
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  AppIconButton(
+                    icon: AppIcons.edit,
+                    tooltip: 'Edit',
+                    size: 28,
+                    iconSize: 14,
+                    onPressed: () {},
+                  ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showVisitDetails(BuildContext context) {
+    if (selfieId == null) return;
+    final imageUrl =
+        '${AppwriteConfig.endpoint}/storage/buckets/${AppwriteConfig.visitSelfiesBucketId}/files/$selfieId/view?project=${AppwriteConfig.projectId}';
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Container(
+          width: 400,
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Visit Check-In Details', style: AppTypography.titleMedium),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 20),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.md),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(
+                  imageUrl,
+                  height: 300,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    height: 300,
+                    width: double.infinity,
+                    color: AppColors.backgroundSecondary,
+                    child: Center(
+                      child: Text('Image not available', style: AppTypography.bodySmall),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              if (location != null && location!.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.backgroundSecondary,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.location_on, size: 20, color: AppColors.primary),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Location Coordinates:\n$location',
+                          style: AppTypography.bodySmall,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }

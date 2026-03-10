@@ -10,7 +10,7 @@ import '../../data/models/employee_model.dart';
 /// Add Employee Drawer - Slide-in form panel
 class AddEmployeeDrawer extends StatefulWidget {
   final VoidCallback onClose;
-  final ValueChanged<Employee> onSave;
+  final void Function(Employee, String?) onSave;
   final Employee? employee; // For edit mode
 
   const AddEmployeeDrawer({
@@ -34,6 +34,7 @@ class _AddEmployeeDrawerState extends State<AddEmployeeDrawer> {
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _alternatePhoneController = TextEditingController();
+  final _passwordController = TextEditingController();
 
   // Form State
   String? _employeeType;
@@ -456,6 +457,29 @@ class _AddEmployeeDrawerState extends State<AddEmployeeDrawer> {
         ),
         const SizedBox(height: AppSpacing.formFieldSpacing),
 
+        // Appwrite Initial Password
+        AppTextField(
+          label: 'Initial App Password',
+          hint: 'Enter password for mobile app login',
+          controller: _passwordController,
+          keyboardType: TextInputType.visiblePassword,
+          isRequired:
+              widget.employee == null, // password required for new users
+          obscureText: true,
+          prefixIcon: AppIcons.lock,
+        ),
+        if (widget.employee == null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              'Required for the employee to login to the mobile app (min 8 characters).',
+              style: AppTypography.caption.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+        const SizedBox(height: AppSpacing.formFieldSpacing),
+
         // Phone Numbers
         Row(
           children: [
@@ -671,7 +695,8 @@ class _AddEmployeeDrawerState extends State<AddEmployeeDrawer> {
                     isPfApplicable: false,
                     isEsicApplicable: false,
                   );
-                  widget.onSave(newEmployee);
+                  final pwd = _passwordController.text.trim();
+                  widget.onSave(newEmployee, pwd.isEmpty ? null : pwd);
                 }
               }
             },

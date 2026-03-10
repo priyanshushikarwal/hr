@@ -1,15 +1,9 @@
 /// Appwrite Configuration Constants
-/// Update these values with your Appwrite instance details
 class AppwriteConfig {
   AppwriteConfig._();
 
   // ============ APPWRITE INSTANCE ============
-  /// Your Appwrite endpoint URL
-  /// For self-hosted: 'https://your-domain.com/v1'
-  /// For Cloud: 'https://cloud.appwrite.io/v1'
   static const String endpoint = 'https://fra.cloud.appwrite.io/v1';
-
-  /// Your Appwrite Project ID
   static const String projectId = '69a6abd60016b9d9b287';
 
   // ============ DATABASE ============
@@ -21,9 +15,20 @@ class AppwriteConfig {
   static const String attendanceCollectionId = 'attendance';
   static const String leaveRequestsCollectionId = 'leave_requests';
   static const String notificationsCollectionId = 'notifications';
+  static const String salaryStructuresCollectionId = 'salary_structures';
+  static const String factorySalaryCollectionId = 'factory_salary';
+  static const String paymentsCollectionId = 'payments';
+  static const String offerLettersCollectionId = 'offer_letters';
+  static const String companySettingsCollectionId = 'company_settings';
+  static const String employeeDocumentsCollectionId = 'employee_documents';
 
   // ============ STORAGE BUCKETS ============
   static const String visitSelfiesBucketId = 'visit_selfies';
+  static const String companyAssetsBucketId = 'company_assets';
+  static const String documentsBucketId = 'documents';
+  static const String employeeDocumentsBucketId = 'employee_documents';
+  static const String salarySlipsBucketId = 'salary_slips';
+  static const String offerLetterPdfsBucketId = 'offer_letter_pdfs';
 
   // ============ ROLES ============
   static const String roleHR = 'hr';
@@ -31,13 +36,10 @@ class AppwriteConfig {
   static const String roleAccountant = 'accountant';
   static const String roleEmployee = 'employee';
 
-  /// Roles allowed for HR Desktop app
   static const List<String> desktopAllowedRoles = [
     roleHR,
     roleManager,
     roleAccountant,
   ];
-
-  /// Roles allowed for Employee Mobile app
   static const List<String> mobileAllowedRoles = [roleEmployee];
 }

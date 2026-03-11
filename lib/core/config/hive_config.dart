@@ -14,6 +14,7 @@ class HiveBoxes {
   static const String notifications = 'notifications_box';
   static const String companySettings = 'company_settings';
   static const String visits = 'visits';
+  static const String tasks = 'tasks';
   static const String offlineQueue = 'offline_queue';
   static const String syncMeta = 'sync_meta';
 }
@@ -37,6 +38,7 @@ class HiveService {
       Hive.openBox<Map>(HiveBoxes.notifications),
       Hive.openBox<Map>(HiveBoxes.companySettings),
       Hive.openBox<Map>(HiveBoxes.visits),
+      Hive.openBox<Map>(HiveBoxes.tasks),
       Hive.openBox<Map>(HiveBoxes.offlineQueue),
       Hive.openBox<String>(HiveBoxes.syncMeta),
     ]);
@@ -58,6 +60,8 @@ class HiveService {
       Hive.box<Map>(HiveBoxes.notifications);
   static Box<Map> get companySettingsBox =>
       Hive.box<Map>(HiveBoxes.companySettings);
+  static Box<Map> get visitsBox => Hive.box<Map>(HiveBoxes.visits);
+  static Box<Map> get tasksBox => Hive.box<Map>(HiveBoxes.tasks);
   static Box<Map> get offlineQueueBox => Hive.box<Map>(HiveBoxes.offlineQueue);
   static Box<String> get syncMetaBox => Hive.box<String>(HiveBoxes.syncMeta);
 }

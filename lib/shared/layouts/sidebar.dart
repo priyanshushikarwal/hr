@@ -69,6 +69,11 @@ const List<NavItem> sidebarItems = [
     route: '/visits',
   ),
   NavItem(
+    label: 'Task Management',
+    icon: AppIcons.checkCircle,
+    route: '/tasks',
+  ),
+  NavItem(
     label: 'Salary Slip & Payments',
     icon: AppIcons.salarySlip,
     route: '/payments',

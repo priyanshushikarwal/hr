@@ -273,6 +273,20 @@ void main() async {
     _attr('updatedAt', 'string', size: 50, required: true),
   ]);
 
+  await _createCollection(databases, 'tasks', 'Tasks', [
+    _attr('title', 'string', size: 500, required: true),
+    _attr('description', 'string', size: 2000),
+    _attr('dueDate', 'string', size: 50, required: true),
+    _attr('status', 'string', size: 20, required: true),
+    _attr('priority', 'string', size: 20),
+    _attr('createdBy', 'string', size: 100, required: true),
+    _attr('assignedTo', 'string', size: 100),
+    _attr('completedAt', 'string', size: 50),
+    _attr('completedBy', 'string', size: 100),
+    _attr('createdAt', 'string', size: 50, required: true),
+    _attr('updatedAt', 'string', size: 50, required: true),
+  ]);
+
   print('\n✅ All collections created successfully!');
   print('   Your app should now work without collection_not_found errors.');
 }

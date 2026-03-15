@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import '../../../../core/theme/app_theme.dart';
+import '../../../../core/theme/theme.dart';
 import '../../../../core/constants/app_icons.dart';
 import '../../data/models/task_model.dart';
 import '../../domain/providers/task_providers.dart';
@@ -155,7 +155,7 @@ class _AddTaskDialogState extends ConsumerState<AddTaskDialog> {
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  prefixIcon: const Icon(Icons.task_outlined),
+                  prefixIcon: Icon(AppIcons.check),
                 ),
                 maxLines: 2,
                 textCapitalization: TextCapitalization.sentences,
@@ -180,7 +180,7 @@ class _AddTaskDialogState extends ConsumerState<AddTaskDialog> {
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  prefixIcon: const Icon(Icons.description_outlined),
+                  prefixIcon: Icon(AppIcons.documents),
                 ),
                 maxLines: 3,
                 textCapitalization: TextCapitalization.sentences,
@@ -221,13 +221,12 @@ class _AddTaskDialogState extends ConsumerState<AddTaskDialog> {
                                 Icon(
                                   AppIcons.calendar,
                                   size: 18,
-                                  color: AppColors.textSecondary,
                                 ),
                                 const SizedBox(width: 8),
                                 Text(
                                   DateFormat('MMM dd, yyyy')
                                       .format(_selectedDueDate),
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                     fontSize: 14,
                                     color: AppColors.textPrimary,
                                   ),

@@ -26,6 +26,8 @@ class ShellScreen extends ConsumerWidget {
       '/salary': 'Salary Structure',
       '/salary/office': 'Office Salary',
       '/salary/factory': 'Factory Salary',
+      '/salary/payroll': 'Generate Payroll',
+      '/salary/advances': 'Advance Tracking',
       '/offer-letters': 'Offer Letters',
       '/attendance': 'Attendance',
       '/leave-requests': 'Leave Requests',
@@ -57,6 +59,10 @@ class ShellScreen extends ConsumerWidget {
         return 'Manage office employee salaries';
       case '/salary/factory':
         return 'Manage factory employee salaries';
+      case '/salary/payroll':
+        return 'Advanced payroll calculation and processing';
+      case '/salary/advances':
+        return 'Track and manage employee advance payments';
       case '/offer-letters':
         return 'Create and manage offer letters';
       case '/attendance':

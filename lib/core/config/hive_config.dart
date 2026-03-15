@@ -8,6 +8,7 @@ class HiveBoxes {
   static const String attendance = 'attendance';
   static const String officeSalary = 'office_salary';
   static const String factorySalary = 'factory_salary';
+  static const String advanceSalary = 'advance_salary';
   static const String leaveRequests = 'leave_requests';
   static const String offerLetters = 'offer_letters';
   static const String payments = 'payments';
@@ -32,6 +33,7 @@ class HiveService {
       Hive.openBox<Map>(HiveBoxes.attendance),
       Hive.openBox<Map>(HiveBoxes.officeSalary),
       Hive.openBox<Map>(HiveBoxes.factorySalary),
+      Hive.openBox<Map>(HiveBoxes.advanceSalary),
       Hive.openBox<Map>(HiveBoxes.leaveRequests),
       Hive.openBox<Map>(HiveBoxes.offerLetters),
       Hive.openBox<Map>(HiveBoxes.payments),

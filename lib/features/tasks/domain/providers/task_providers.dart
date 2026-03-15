@@ -65,7 +65,7 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      final isOnline = _ref.read(networkServiceProvider).isConnected;
+      final isOnline = _ref.watch(networkStatusProvider) == NetworkStatus.online;
 
       DateTime? parsedDate;
       if (filterDate != null) {
@@ -95,7 +95,7 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
     String priority = 'medium',
   }) async {
     try {
-      final isOnline = _ref.read(networkServiceProvider).isConnected;
+      final isOnline = _ref.watch(networkStatusProvider) == NetworkStatus.online;
 
       final newTask = await _repository.createTask(
         title,
@@ -116,7 +116,7 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
 
   Future<void> deleteTask(String taskId) async {
     try {
-      final isOnline = _ref.read(networkServiceProvider).isConnected;
+      final isOnline = _ref.watch(networkStatusProvider) == NetworkStatus.online;
 
       await _repository.deleteTask(taskId, isOnline: isOnline);
 
@@ -131,7 +131,7 @@ class TaskListNotifier extends StateNotifier<TaskListState> {
 
   Future<void> markTaskComplete(String taskId, String completedBy) async {
     try {
-      final isOnline = _ref.read(networkServiceProvider).isConnected;
+      final isOnline = _ref.watch(networkStatusProvider) == NetworkStatus.online;
 
       await _repository.markTaskComplete(taskId, completedBy, isOnline: isOnline);
 

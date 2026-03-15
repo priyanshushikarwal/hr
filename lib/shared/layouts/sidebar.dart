@@ -49,6 +49,16 @@ const List<NavItem> sidebarItems = [
         icon: AppIcons.factory,
         route: '/salary/factory',
       ),
+      NavItem(
+        label: 'Generate Payroll',
+        icon: AppIcons.salarySlip,
+        route: '/salary/payroll',
+      ),
+      NavItem(
+        label: 'Advances Tracking',
+        icon: AppIcons.money,
+        route: '/salary/advances',
+      ),
     ],
   ),
   NavItem(
@@ -70,7 +80,7 @@ const List<NavItem> sidebarItems = [
   ),
   NavItem(
     label: 'Task Management',
-    icon: AppIcons.checkCircle,
+    icon: AppIcons.check,
     route: '/tasks',
   ),
   NavItem(

@@ -211,6 +211,27 @@ void main() async {
     _attr('createdBy', 'string', size: 100),
   ]);
 
+  await _createCollection(databases, 'advance_salary', 'Advance Salary', [
+    _attr('employeeId', 'string', size: 100, required: true),
+    _attr('employeeCode', 'string', size: 50, required: true),
+    _attr('advanceAmount', 'double', required: true),
+    _attr('reason', 'string', size: 1000, required: true),
+    _attr('status', 'string', size: 50, required: true),
+    _attr('repaidAmount', 'double', required: true),
+    _attr('pendingAmount', 'double', required: true),
+    _attr('installments', 'integer', required: true),
+    _attr('installmentsCleared', 'integer', required: true),
+    _attr('requestDate', 'string', size: 50, required: true),
+    _attr('approvalDate', 'string', size: 50),
+    _attr('clearanceDate', 'string', size: 50),
+    _attr('remarks', 'string', size: 1000),
+    _attr('approvedBy', 'string', size: 100),
+    _attr('createdBy', 'string', size: 100),
+    _attr('updatedBy', 'string', size: 100),
+    _attr('createdAt', 'string', size: 50, required: true),
+    _attr('updatedAt', 'string', size: 50, required: true),
+  ]);
+
   await _createCollection(databases, 'offer_letters', 'Offer Letters', [
     _attr('employeeId', 'string', size: 100, required: true),
     _attr('employeeCode', 'string', size: 50),

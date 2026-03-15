@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import '../../../../core/theme/app_theme.dart';
+import '../../../../core/theme/theme.dart';
 import '../../../../core/constants/app_icons.dart';
-import '../../../../shared/layouts/main_layout.dart';
 import '../../../../shared/layouts/header.dart';
 import '../../data/models/task_model.dart';
 import '../../domain/providers/task_providers.dart';
@@ -28,13 +27,13 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
   Widget build(BuildContext context) {
     final taskState = ref.watch(taskListProvider);
 
-    return MainLayout(
-      child: SingleChildScrollView(
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Header
-            const Header(
+            const AppHeader(
               title: 'Task Management',
               subtitle: 'Create, track, and manage daily tasks for your team',
             ),
@@ -70,7 +69,6 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
             const SizedBox(height: 40),
           ],
         ),
-      ),
     );
   }
 
@@ -80,7 +78,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
         _SummaryCard(
           label: 'Total Tasks',
           value: state.tasks.length.toString(),
-          icon: AppIcons.checkCircle,
+          icon: AppIcons.check,
           color: AppColors.primary,
         ),
         const SizedBox(width: 16),
@@ -94,7 +92,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
         _SummaryCard(
           label: 'Completed',
           value: state.completedCount.toString(),
-          icon: AppIcons.checkCircle,
+          icon: AppIcons.check,
           color: AppColors.success,
         ),
         const SizedBox(width: 16),
@@ -215,7 +213,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
         child: Column(
           children: [
             Icon(
-              AppIcons.checkCircle,
+              AppIcons.check,
               size: 64,
               color: AppColors.textTertiary.withValues(alpha: 0.3),
             ),

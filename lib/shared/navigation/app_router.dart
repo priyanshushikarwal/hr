@@ -10,6 +10,8 @@ import '../../features/kyc/presentation/screens/kyc_screen.dart';
 import '../../features/attendance/presentation/screens/attendance_screen.dart';
 import '../../features/salary/presentation/screens/office_salary_screen.dart';
 import '../../features/salary/presentation/screens/factory_salary_screen.dart';
+import '../../features/salary/presentation/screens/generate_payroll_screen.dart';
+import '../../features/salary/presentation/screens/all_advance_tracking_screen.dart';
 import '../../features/offer_letter/presentation/screens/offer_letter_screen.dart';
 import '../../features/payments/presentation/screens/payments_screen.dart';
 import '../../features/leave/presentation/screens/leave_approval_screen.dart';
@@ -143,6 +145,24 @@ class AppRouter {
                   pageBuilder: (context, state) => CustomTransitionPage(
                     key: state.pageKey,
                     child: const FactorySalaryScreen(),
+                    transitionsBuilder: _fadeTransition,
+                  ),
+                ),
+                GoRoute(
+                  path: 'payroll',
+                  name: 'salary-payroll',
+                  pageBuilder: (context, state) => CustomTransitionPage(
+                    key: state.pageKey,
+                    child: const GeneratePayrollScreen(),
+                    transitionsBuilder: _fadeTransition,
+                  ),
+                ),
+                GoRoute(
+                  path: 'advances',
+                  name: 'salary-advances',
+                  pageBuilder: (context, state) => CustomTransitionPage(
+                    key: state.pageKey,
+                    child: const AllAdvanceTrackingScreen(),
                     transitionsBuilder: _fadeTransition,
                   ),
                 ),

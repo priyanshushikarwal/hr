@@ -17,6 +17,7 @@ class AppwriteConfig {
   static const String notificationsCollectionId = 'notifications';
   static const String salaryStructuresCollectionId = 'salary_structures';
   static const String factorySalaryCollectionId = 'factory_salary';
+  static const String advanceSalaryCollectionId = 'advance_salary';
   static const String paymentsCollectionId = 'payments';
   static const String offerLettersCollectionId = 'offer_letters';
   static const String companySettingsCollectionId = 'company_settings';

@@ -379,6 +379,250 @@ class SalaryRepository {
     }
   }
 
+  // ==== ADVANCE SALARY ====
+
+  static const _advanceCollectionId = AppwriteConfig.advanceSalaryCollectionId;
+  static const _advanceBoxName = HiveBoxes.advanceSalary;
+
+  /// Get all advances for an employee
+  Future<List<AdvanceSalary>> getEmployeeAdvances(
+    String employeeId, {
+    required bool isOnline,
+  }) async {
+    if (isOnline) {
+      try {
+        final response = await _databases.listDocuments(
+          databaseId: AppwriteConfig.databaseId,
+          collectionId: _advanceCollectionId,
+          queries: [
+            Query.equal('employeeId', employeeId),
+            Query.orderDesc('requestDate'),
+            Query.limit(100),
+          ],
+        );
+        final advances = response.documents
+            .map(
+              (doc) => AdvanceSalary.fromJson({
+                ...doc.data,
+                'id': doc.$id,
+              }),
+            )
+            .toList();
+        // Cache
+        final box = HiveService.getBox(_advanceBoxName);
+        for (final adv in advances) {
+          await box.put(adv.id, adv.toJson());
+        }
+        return advances;
+      } catch (_) {
+        return _getAdvancesFromHive(employeeId);
+      }
+    } else {
+      return _getAdvancesFromHive(employeeId);
+    }
+  }
+
+  List<AdvanceSalary> _getAdvancesFromHive(String employeeId) {
+    final box = HiveService.getBox(_advanceBoxName);
+    final advances = <AdvanceSalary>[];
+    for (final v in box.values) {
+      final map = Map<String, dynamic>.from(v);
+      if (map['employeeId'] == employeeId) {
+        advances.add(AdvanceSalary.fromJson(map));
+      }
+    }
+    advances.sort((a, b) => b.requestDate.compareTo(a.requestDate));
+    return advances;
+  }
+
+  /// Get all pending advances
+  Future<List<AdvanceSalary>> getPendingAdvances({
+    required bool isOnline,
+  }) async {
+    if (isOnline) {
+      try {
+        final response = await _databases.listDocuments(
+          databaseId: AppwriteConfig.databaseId,
+          collectionId: _advanceCollectionId,
+          queries: [
+            Query.equal('status', 'approved'),
+            Query.orderDesc('requestDate'),
+            Query.limit(100),
+          ],
+        );
+        final advances = response.documents
+            .map(
+              (doc) => AdvanceSalary.fromJson({
+                ...doc.data,
+                'id': doc.$id,
+              }),
+            )
+            .toList();
+        // Cache
+        final box = HiveService.getBox(_advanceBoxName);
+        for (final adv in advances) {
+          await box.put(adv.id, adv.toJson());
+        }
+        return advances;
+      } catch (_) {
+        return _getPendingAdvancesFromHive();
+      }
+    } else {
+      return _getPendingAdvancesFromHive();
+    }
+  }
+
+  List<AdvanceSalary> _getPendingAdvancesFromHive() {
+    final box = HiveService.getBox(_advanceBoxName);
+    return box.values
+        .map((v) => AdvanceSalary.fromJson(Map<String, dynamic>.from(v)))
+        .where((adv) => adv.status == 'approved')
+        .toList();
+  }
+
+  /// Create new advance salary request
+  Future<AdvanceSalary> createAdvance(
+    AdvanceSalary advance, {
+    required bool isOnline,
+  }) async {
+    final data = advance.toJson()..remove('id');
+
+    if (isOnline) {
+      try {
+        final doc = await _databases.createDocument(
+          databaseId: AppwriteConfig.databaseId,
+          collectionId: _advanceCollectionId,
+          documentId: ID.unique(),
+          data: data,
+        );
+        final result = AdvanceSalary.fromJson({
+          ...doc.data,
+          'id': doc.$id,
+        });
+        final box = HiveService.getBox(_advanceBoxName);
+        await box.put(result.id, result.toJson());
+        return result;
+      } on AppwriteException catch (e) {
+        throw Exception('Failed to create advance: ${e.message}');
+      }
+    } else {
+      final docId = const Uuid().v4();
+      final local = advance.copyWith(id: docId);
+      final box = HiveService.getBox(_advanceBoxName);
+      await box.put(docId, local.toJson());
+      await OfflineQueueManager.instance.enqueue(
+        OfflineOperation(
+          id: const Uuid().v4(),
+          collection: _advanceCollectionId,
+          type: 'create',
+          documentId: docId,
+          data: data,
+          timestamp: DateTime.now(),
+        ),
+      );
+      return local;
+    }
+  }
+
+  /// Update advance salary (approval, repayment tracking, etc.)
+  Future<AdvanceSalary> updateAdvance(
+    String documentId,
+    AdvanceSalary advance, {
+    required bool isOnline,
+  }) async {
+    final data = advance.toJson()..remove('id');
+
+    if (isOnline) {
+      try {
+        final doc = await _databases.updateDocument(
+          databaseId: AppwriteConfig.databaseId,
+          collectionId: _advanceCollectionId,
+          documentId: documentId,
+          data: data,
+        );
+        final result = AdvanceSalary.fromJson({
+          ...doc.data,
+          'id': doc.$id,
+        });
+        final box = HiveService.getBox(_advanceBoxName);
+        await box.put(result.id, result.toJson());
+        return result;
+      } on AppwriteException catch (e) {
+        throw Exception('Failed to update advance: ${e.message}');
+      }
+    } else {
+      final box = HiveService.getBox(_advanceBoxName);
+      await box.put(documentId, advance.toJson());
+      await OfflineQueueManager.instance.enqueue(
+        OfflineOperation(
+          id: const Uuid().v4(),
+          collection: _advanceCollectionId,
+          type: 'update',
+          documentId: documentId,
+          data: data,
+          timestamp: DateTime.now(),
+        ),
+      );
+      return advance;
+    }
+  }
+
+  /// Get active pending advances for an employee (for salary deduction)
+  Future<double> getTotalPendingAdvanceAmount(
+    String employeeId, {
+    required bool isOnline,
+  }) async {
+    final advances = await getEmployeeAdvances(
+      employeeId,
+      isOnline: isOnline,
+    );
+    
+    // Sum all pending amounts from approved advances not yet cleared
+    double totalPending = 0;
+    for (final adv in advances) {
+      if (adv.status == 'approved' || adv.status == 'partial') {
+        totalPending += adv.pendingAmount;
+      }
+    }
+    return totalPending;
+  }
+
+  /// Record advance repayment/deduction from salary
+  Future<AdvanceSalary> recordAdvanceDeduction(
+    String advanceId,
+    double deductionAmount, {
+    required bool isOnline,
+  }) async {
+    final box = HiveService.getBox(_advanceBoxName);
+    final existing = box.get(advanceId);
+    if (existing == null) {
+      throw Exception('Advance not found');
+    }
+
+    final advanceMap = Map<String, dynamic>.from(existing);
+    final advance = AdvanceSalary.fromJson(advanceMap);
+    
+    // Update repayment tracking
+    final newRepaid = advance.repaidAmount + deductionAmount;
+    final newPending = AdvanceSalary.calculatePendingAmount(
+      advance.advanceAmount,
+      newRepaid,
+    );
+    final newStatus = newPending <= 0 ? 'cleared' : 'partial';
+    final clearanceDate = newPending <= 0 ? DateTime.now() : null;
+
+    final updated = advance.copyWith(
+      repaidAmount: newRepaid,
+      pendingAmount: newPending,
+      status: newStatus,
+      clearanceDate: clearanceDate,
+      installmentsCleared: advance.installmentsCleared + 1,
+      updatedAt: DateTime.now(),
+    );
+
+    return updateAdvance(advanceId, updated, isOnline: isOnline);
+  }
+
   // ==== Helper ====
   List<T> _getAllFromHive<T>(
     String boxName,

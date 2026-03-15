@@ -225,10 +225,10 @@ class OfficeSalaryStructure extends Equatable {
 
   factory OfficeSalaryStructure.fromJson(Map<String, dynamic> json) {
     return OfficeSalaryStructure(
-      id: json['id'] as String,
-      employeeId: json['employeeId'] as String,
-      employeeCode: json['employeeCode'] as String,
-      effectiveFrom: DateTime.parse(json['effectiveFrom'] as String),
+      id: json['id'] as String? ?? json[r'$id'] as String? ?? '',
+      employeeId: json['employeeId'] as String? ?? '',
+      employeeCode: json['employeeCode'] as String? ?? '',
+      effectiveFrom: DateTime.parse(json['effectiveFrom'] as String? ?? DateTime.now().toIso8601String()),
       effectiveTo: json['effectiveTo'] != null
           ? DateTime.parse(json['effectiveTo'] as String)
           : null,
@@ -466,5 +466,189 @@ class FactorySalaryEntry extends Equatable {
     createdAt,
     createdBy,
     status,
+  ];
+}
+
+/// Advance Salary Model - Track salary advances given to employees
+class AdvanceSalary extends Equatable {
+  final String id;
+  final String employeeId;
+  final String employeeCode;
+  final double advanceAmount;
+  final String reason; // Reason for advance request
+  final String status; // 'pending', 'approved', 'rejected', 'cleared', 'partial'
+  
+  // Repayment tracking
+  final double repaidAmount; // Amount repaid so far
+  final double pendingAmount; // Amount still pending (advanceAmount - repaidAmount)
+  final int installments; // Number of installments for repayment
+  final int installmentsCleared; // Number of cleared installments
+  
+  // Dates
+  final DateTime requestDate;
+  final DateTime? approvalDate;
+  final DateTime? clearanceDate; // When fully cleared
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  
+  // Metadata
+  final String? remarks;
+  final String? approvedBy;
+  final String? createdBy;
+  final String? updatedBy;
+
+  const AdvanceSalary({
+    required this.id,
+    required this.employeeId,
+    required this.employeeCode,
+    required this.advanceAmount,
+    required this.reason,
+    this.status = 'pending',
+    this.repaidAmount = 0,
+    this.pendingAmount = 0,
+    this.installments = 1,
+    this.installmentsCleared = 0,
+    required this.requestDate,
+    this.approvalDate,
+    this.clearanceDate,
+    required this.createdAt,
+    required this.updatedAt,
+    this.remarks,
+    this.approvedBy,
+    this.createdBy,
+    this.updatedBy,
+  });
+
+  /// Calculate pending amount
+  static double calculatePendingAmount(double advance, double repaid) {
+    return (advance - repaid).clamp(0.0, double.infinity);
+  }
+
+  /// Check if advance is fully cleared
+  bool get isCleared => status == 'cleared' || pendingAmount <= 0;
+
+  /// Get repayment percentage
+  double get repaymentPercentage {
+    if (advanceAmount == 0) return 0;
+    return (repaidAmount / advanceAmount * 100).clamp(0.0, 100.0);
+  }
+
+  AdvanceSalary copyWith({
+    String? id,
+    String? employeeId,
+    String? employeeCode,
+    double? advanceAmount,
+    String? reason,
+    String? status,
+    double? repaidAmount,
+    double? pendingAmount,
+    int? installments,
+    int? installmentsCleared,
+    DateTime? requestDate,
+    DateTime? approvalDate,
+    DateTime? clearanceDate,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    String? remarks,
+    String? approvedBy,
+    String? createdBy,
+    String? updatedBy,
+  }) {
+    return AdvanceSalary(
+      id: id ?? this.id,
+      employeeId: employeeId ?? this.employeeId,
+      employeeCode: employeeCode ?? this.employeeCode,
+      advanceAmount: advanceAmount ?? this.advanceAmount,
+      reason: reason ?? this.reason,
+      status: status ?? this.status,
+      repaidAmount: repaidAmount ?? this.repaidAmount,
+      pendingAmount: pendingAmount ?? this.pendingAmount,
+      installments: installments ?? this.installments,
+      installmentsCleared: installmentsCleared ?? this.installmentsCleared,
+      requestDate: requestDate ?? this.requestDate,
+      approvalDate: approvalDate ?? this.approvalDate,
+      clearanceDate: clearanceDate ?? this.clearanceDate,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      remarks: remarks ?? this.remarks,
+      approvedBy: approvedBy ?? this.approvedBy,
+      createdBy: createdBy ?? this.createdBy,
+      updatedBy: updatedBy ?? this.updatedBy,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'employeeId': employeeId,
+      'employeeCode': employeeCode,
+      'advanceAmount': advanceAmount,
+      'reason': reason,
+      'status': status,
+      'repaidAmount': repaidAmount,
+      'pendingAmount': pendingAmount,
+      'installments': installments,
+      'installmentsCleared': installmentsCleared,
+      'requestDate': requestDate.toIso8601String(),
+      'approvalDate': approvalDate?.toIso8601String(),
+      'clearanceDate': clearanceDate?.toIso8601String(),
+      'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
+      'remarks': remarks,
+      'approvedBy': approvedBy,
+      'createdBy': createdBy,
+      'updatedBy': updatedBy,
+    };
+  }
+
+  factory AdvanceSalary.fromJson(Map<String, dynamic> json) {
+    return AdvanceSalary(
+      id: json['id'] as String? ?? json[r'$id'] as String? ?? '',
+      employeeId: json['employeeId'] as String? ?? '',
+      employeeCode: json['employeeCode'] as String? ?? '',
+      advanceAmount: (json['advanceAmount'] as num?)?.toDouble() ?? 0,
+      reason: json['reason'] as String? ?? 'Not specified',
+      status: json['status'] as String? ?? 'pending',
+      repaidAmount: (json['repaidAmount'] as num?)?.toDouble() ?? 0,
+      pendingAmount: (json['pendingAmount'] as num?)?.toDouble() ?? 0,
+      installments: json['installments'] as int? ?? 1,
+      installmentsCleared: json['installmentsCleared'] as int? ?? 0,
+      requestDate: DateTime.parse(json['requestDate'] as String),
+      approvalDate: json['approvalDate'] != null
+          ? DateTime.parse(json['approvalDate'] as String)
+          : null,
+      clearanceDate: json['clearanceDate'] != null
+          ? DateTime.parse(json['clearanceDate'] as String)
+          : null,
+      createdAt: DateTime.parse(json['createdAt'] as String),
+      updatedAt: DateTime.parse(json['updatedAt'] as String),
+      remarks: json['remarks'] as String?,
+      approvedBy: json['approvedBy'] as String?,
+      createdBy: json['createdBy'] as String?,
+      updatedBy: json['updatedBy'] as String?,
+    );
+  }
+
+  @override
+  List<Object?> get props => [
+    id,
+    employeeId,
+    employeeCode,
+    advanceAmount,
+    reason,
+    status,
+    repaidAmount,
+    pendingAmount,
+    installments,
+    installmentsCleared,
+    requestDate,
+    approvalDate,
+    clearanceDate,
+    createdAt,
+    updatedAt,
+    remarks,
+    approvedBy,
+    createdBy,
+    updatedBy,
   ];
 }

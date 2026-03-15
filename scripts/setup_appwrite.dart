@@ -308,6 +308,19 @@ void main() async {
     _attr('updatedAt', 'string', size: 50, required: true),
   ]);
 
+  await _createCollection(databases, 'experience', 'Experience', [
+    _attr('employeeId', 'string', size: 100, required: true),
+    _attr('companyName', 'string', size: 255, required: true),
+    _attr('designation', 'string', size: 255, required: true),
+    _attr('startDate', 'string', size: 50, required: true),
+    _attr('endDate', 'string', size: 50),
+    _attr('isCurrent', 'boolean'),
+    _attr('location', 'string', size: 255),
+    _attr('description', 'string', size: 1000),
+    _attr('createdAt', 'string', size: 50, required: true),
+    _attr('updatedAt', 'string', size: 50, required: true),
+  ]);
+
   print('\n✅ All collections created successfully!');
   print('   Your app should now work without collection_not_found errors.');
 }

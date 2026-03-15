@@ -141,7 +141,9 @@ class _MarkAttendanceDialogState extends ConsumerState<MarkAttendanceDialog> {
                   ),
                 );
               }).toList(),
-              onChanged: (val) => setState(() => _selectedEmployee = val),
+              onChanged: (_isLoading || _successMessage != null)
+                  ? null
+                  : (val) => setState(() => _selectedEmployee = val),
             ),
             const SizedBox(height: 20),
 
@@ -149,7 +151,7 @@ class _MarkAttendanceDialogState extends ConsumerState<MarkAttendanceDialog> {
             Text('Date', style: AppTypography.formLabel),
             const SizedBox(height: 8),
             InkWell(
-              onTap: _pickDate,
+              onTap: (_isLoading || _successMessage != null) ? null : _pickDate,
               borderRadius: BorderRadius.circular(12),
               child: Container(
                 height: 48,
@@ -191,9 +193,11 @@ class _MarkAttendanceDialogState extends ConsumerState<MarkAttendanceDialog> {
               children: _statusOptions.map((option) {
                 final isSelected = _selectedStatus == option['value'];
                 return InkWell(
-                  onTap: () => setState(
-                    () => _selectedStatus = option['value'] as String,
-                  ),
+                  onTap: (_isLoading || _successMessage != null)
+                      ? null
+                      : () => setState(
+                            () => _selectedStatus = option['value'] as String,
+                          ),
                   borderRadius: BorderRadius.circular(10),
                   child: AnimatedContainer(
                     duration: AppSpacing.durationFast,
@@ -249,6 +253,7 @@ class _MarkAttendanceDialogState extends ConsumerState<MarkAttendanceDialog> {
             TextField(
               controller: _remarksController,
               maxLines: 2,
+              enabled: !_isLoading && _successMessage == null,
               decoration: InputDecoration(
                 hintText: 'Add any notes...',
                 border: OutlineInputBorder(
@@ -311,15 +316,27 @@ class _MarkAttendanceDialogState extends ConsumerState<MarkAttendanceDialog> {
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 SecondaryButton(
-                  text: 'Cancel',
-                  onPressed: () => Navigator.pop(context),
+                  text: _successMessage != null ? 'Close' : 'Cancel',
+                  onPressed: _isLoading ? null : () => Navigator.pop(context, _successMessage != null),
                 ),
                 const SizedBox(width: 12),
-                PrimaryButton(
-                  text: _isLoading ? 'Saving...' : 'Mark Attendance',
-                  icon: _isLoading ? null : AppIcons.check,
-                  onPressed: _isLoading ? null : _handleSubmit,
-                ),
+                if (_successMessage == null)
+                  PrimaryButton(
+                    text: _isLoading ? 'Saving...' : 'Mark Attendance',
+                    icon: _isLoading ? null : AppIcons.check,
+                    onPressed: _isLoading ? null : _handleSubmit,
+                  )
+                else
+                  PrimaryButton(
+                    text: 'Mark Another',
+                    icon: AppIcons.add,
+                    onPressed: () {
+                      setState(() {
+                        _successMessage = null;
+                        _remarksController.clear();
+                      });
+                    },
+                  ),
               ],
             ),
           ],
@@ -378,9 +395,6 @@ class _MarkAttendanceDialogState extends ConsumerState<MarkAttendanceDialog> {
         _successMessage =
             'Attendance marked as ${_selectedStatus.replaceAll('_', ' ')} for ${_selectedEmployee!.fullName}';
       });
-
-      await Future.delayed(const Duration(seconds: 2));
-      if (mounted) Navigator.pop(context, true);
     } catch (e) {
       setState(() {
         _isLoading = false;

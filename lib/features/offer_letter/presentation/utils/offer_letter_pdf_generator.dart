@@ -83,6 +83,9 @@ class OfferLetterPdfGenerator {
     final font = await PdfGoogleFonts.notoSansRegular();
     final fontBold = await PdfGoogleFonts.notoSansBold();
 
+    // Load Seal Image
+    final sealImage = await imageFromAssetBundle('assets/images/seal_signature.jpg');
+
     // Calculate salary components from CTC
     final ctc = letter.ctc;
     final basicSalary = basic ?? (ctc * 0.50);
@@ -397,7 +400,10 @@ class OfferLetterPdfGenerator {
           ),
           pw.SizedBox(height: 4),
           pw.Text('HR Department', style: const pw.TextStyle(fontSize: 10)),
-          pw.SizedBox(height: 30),
+          pw.SizedBox(height: 10),
+          // Seal and Signature
+          pw.Image(sealImage, width: 120),
+          pw.SizedBox(height: 10),
 
           // Candidate's Acceptance
           pw.Text(

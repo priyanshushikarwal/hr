@@ -272,7 +272,13 @@ class PreviewOfferLetterDialog extends StatelessWidget {
                         ),
                       ),
                       Text('HR Department', style: AppTypography.bodySmall),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 8),
+                      Image.asset(
+                        'assets/images/seal_signature.jpg',
+                        width: 120,
+                        fit: BoxFit.contain,
+                      ),
+                      const SizedBox(height: 16),
 
                       // Salary Breakup
                       Container(height: 2, color: AppColors.primary),

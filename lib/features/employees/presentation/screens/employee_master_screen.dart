@@ -35,6 +35,7 @@ class _EmployeeMasterScreenState extends ConsumerState<EmployeeMasterScreen> {
   Set<String> _selectedIds = {};
   bool _showFilters = false;
   bool _showAddDrawer = false;
+  Employee? _editingEmployee;
 
   List<Employee> _getFilteredEmployees(List<Employee> employees) {
     var filtered = employees;
@@ -137,7 +138,10 @@ class _EmployeeMasterScreenState extends ConsumerState<EmployeeMasterScreen> {
                     text: 'Add Employee',
                     icon: AppIcons.userAdd,
                     onPressed: () {
-                      setState(() => _showAddDrawer = true);
+                      setState(() {
+                        _editingEmployee = null;
+                        _showAddDrawer = true;
+                      });
                     },
                   ),
                 ],
@@ -188,17 +192,36 @@ class _EmployeeMasterScreenState extends ConsumerState<EmployeeMasterScreen> {
         // Add Employee Drawer
         if (_showAddDrawer)
           AddEmployeeDrawer(
-            onClose: () => setState(() => _showAddDrawer = false),
+            employee: _editingEmployee,
+            onClose: () => setState(() {
+              _showAddDrawer = false;
+              _editingEmployee = null;
+            }),
             onSave: (employee, password) async {
-              setState(() => _showAddDrawer = false);
+              final isEdit = _editingEmployee != null;
+              setState(() {
+                _showAddDrawer = false;
+                _editingEmployee = null;
+              });
               try {
-                await ref
-                    .read(employeeListProvider.notifier)
-                    .createEmployee(employee, password: password);
+                if (isEdit) {
+                  final data = employee.toJson()..remove('id');
+                  await ref
+                      .read(employeeListProvider.notifier)
+                      .updateEmployee(employee.id, data);
+                } else {
+                  await ref
+                      .read(employeeListProvider.notifier)
+                      .createEmployee(employee, password: password);
+                }
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Employee saved successfully'),
+                    SnackBar(
+                      content: Text(
+                        isEdit
+                            ? 'Employee updated successfully'
+                            : 'Employee saved successfully',
+                      ),
                     ),
                   );
                 }
@@ -586,7 +609,12 @@ class _EmployeeMasterScreenState extends ConsumerState<EmployeeMasterScreen> {
                     tooltip: 'Edit',
                     size: 32,
                     iconSize: 16,
-                    onPressed: () {},
+                    onPressed: () {
+                      setState(() {
+                        _editingEmployee = employee;
+                        _showAddDrawer = true;
+                      });
+                    },
                   ),
                 ],
               ),

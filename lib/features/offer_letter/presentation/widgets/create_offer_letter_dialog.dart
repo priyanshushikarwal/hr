@@ -25,17 +25,23 @@ class CreateOfferLetterDialog extends ConsumerStatefulWidget {
 class _CreateOfferLetterDialogState
     extends ConsumerState<CreateOfferLetterDialog> {
   Employee? _selectedEmployee;
+  bool _useManualCandidate = false;
   DateTime _joiningDate = DateTime.now();
   final _ctcController = TextEditingController();
   final _basicController = TextEditingController();
   final _hraController = TextEditingController();
   final _saController = TextEditingController();
+  final _employeeNameController = TextEditingController();
+  final _employeeCodeController = TextEditingController();
+  final _designationController = TextEditingController();
+  final _departmentController = TextEditingController();
   final _reportingManagerController = TextEditingController();
   final _addressController = TextEditingController();
   final _remarksController = TextEditingController();
   bool _isLoading = false;
   String? _error;
   bool _autoCalc = true;
+  String _manualEmployeeType = 'office';
 
   bool get _isEditing => widget.existingLetter != null;
 
@@ -47,6 +53,12 @@ class _CreateOfferLetterDialogState
       _ctcController.text = l.ctc.toInt().toString();
       _remarksController.text = l.remarks ?? '';
       _joiningDate = l.joiningDate;
+      _employeeNameController.text = l.employeeName;
+      _employeeCodeController.text = l.employeeCode;
+      _designationController.text = l.designation;
+      _departmentController.text = l.department;
+      _manualEmployeeType = l.employeeType.isEmpty ? 'office' : l.employeeType;
+      _useManualCandidate = true;
       // Auto-calculate salary components from CTC
       _recalcSalary(l.ctc);
     }
@@ -68,6 +80,10 @@ class _CreateOfferLetterDialogState
     _basicController.dispose();
     _hraController.dispose();
     _saController.dispose();
+    _employeeNameController.dispose();
+    _employeeCodeController.dispose();
+    _designationController.dispose();
+    _departmentController.dispose();
     _reportingManagerController.dispose();
     _addressController.dispose();
     _remarksController.dispose();
@@ -144,6 +160,136 @@ class _CreateOfferLetterDialogState
                   children: [
                     // Employee Selection (only for create)
                     if (!_isEditing) ...[
+                      Text('Letter For', style: AppTypography.formLabel),
+                      const SizedBox(height: 8),
+                      SegmentedButton<bool>(
+                        segments: const [
+                          ButtonSegment<bool>(
+                            value: false,
+                            icon: Icon(AppIcons.user, size: 16),
+                            label: Text('Existing Employee'),
+                          ),
+                          ButtonSegment<bool>(
+                            value: true,
+                            icon: Icon(AppIcons.edit, size: 16),
+                            label: Text('Manual Candidate'),
+                          ),
+                        ],
+                        selected: {_useManualCandidate},
+                        onSelectionChanged: (selection) {
+                          setState(() {
+                            _useManualCandidate = selection.first;
+                            _error = null;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 18),
+                    ],
+
+                    if (_isEditing || _useManualCandidate) ...[
+                      Text(
+                        'Candidate Details *',
+                        style: AppTypography.formLabel,
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _employeeNameController,
+                        decoration: InputDecoration(
+                          hintText: 'Candidate full name',
+                          prefixIcon: const Icon(AppIcons.user, size: 18),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _designationController,
+                              decoration: InputDecoration(
+                                hintText: 'Designation',
+                                prefixIcon: const Icon(
+                                  AppIcons.designation,
+                                  size: 18,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextField(
+                              controller: _departmentController,
+                              decoration: InputDecoration(
+                                hintText: 'Department',
+                                prefixIcon: const Icon(
+                                  AppIcons.department,
+                                  size: 18,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _employeeCodeController,
+                              decoration: InputDecoration(
+                                hintText: 'Employee/Candidate Code (optional)',
+                                prefixIcon: const Icon(
+                                  AppIcons.employeeMaster,
+                                  size: 18,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              value: _manualEmployeeType,
+                              decoration: InputDecoration(
+                                hintText: 'Employee type',
+                                prefixIcon: const Icon(
+                                  AppIcons.employees,
+                                  size: 18,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              items: const [
+                                DropdownMenuItem(
+                                  value: 'office',
+                                  child: Text('Office Employee'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'factory',
+                                  child: Text('Factory Employee'),
+                                ),
+                              ],
+                              onChanged: (value) {
+                                if (value == null) return;
+                                setState(() => _manualEmployeeType = value);
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+                    ] else ...[
                       Text('Select Employee *', style: AppTypography.formLabel),
                       const SizedBox(height: 8),
                       DropdownButtonFormField<Employee>(
@@ -501,8 +647,23 @@ class _CreateOfferLetterDialogState
   }
 
   Future<void> _handleSubmit() async {
-    if (!_isEditing && _selectedEmployee == null) {
+    if (!_isEditing && !_useManualCandidate && _selectedEmployee == null) {
       setState(() => _error = 'Please select an employee');
+      return;
+    }
+    if ((_isEditing || _useManualCandidate) &&
+        _employeeNameController.text.trim().isEmpty) {
+      setState(() => _error = 'Please enter candidate name');
+      return;
+    }
+    if ((_isEditing || _useManualCandidate) &&
+        _designationController.text.trim().isEmpty) {
+      setState(() => _error = 'Please enter designation');
+      return;
+    }
+    if ((_isEditing || _useManualCandidate) &&
+        _departmentController.text.trim().isEmpty) {
+      setState(() => _error = 'Please enter department');
       return;
     }
     if (_ctcController.text.isEmpty) {
@@ -530,6 +691,30 @@ class _CreateOfferLetterDialogState
       final hra = double.tryParse(_hraController.text) ?? 0;
       final sa = double.tryParse(_saController.text) ?? 0;
       final grossSalary = basic + hra + sa;
+      final generatedCode =
+          'CAND-${now.year}-${now.millisecondsSinceEpoch.toString().substring(8)}';
+      final employeeCode = (_isEditing || _useManualCandidate)
+          ? (_employeeCodeController.text.trim().isEmpty
+                ? generatedCode
+                : _employeeCodeController.text.trim())
+          : emp!.employeeCode;
+      final employeeId = (_isEditing || _useManualCandidate)
+          ? (widget.existingLetter?.employeeId.isNotEmpty == true
+                ? widget.existingLetter!.employeeId
+                : 'manual-${now.millisecondsSinceEpoch}')
+          : emp!.id;
+      final employeeName = (_isEditing || _useManualCandidate)
+          ? _employeeNameController.text.trim()
+          : emp!.fullName;
+      final designation = (_isEditing || _useManualCandidate)
+          ? _designationController.text.trim()
+          : emp!.designation;
+      final department = (_isEditing || _useManualCandidate)
+          ? _departmentController.text.trim()
+          : emp!.department;
+      final employeeType = (_isEditing || _useManualCandidate)
+          ? _manualEmployeeType
+          : emp!.employeeType;
 
       if (_isEditing) {
         // TODO: implement update
@@ -537,12 +722,12 @@ class _CreateOfferLetterDialogState
       } else {
         final letter = OfferLetter(
           id: '',
-          employeeId: emp!.id,
-          employeeCode: emp.employeeCode,
-          employeeName: emp.fullName,
-          designation: emp.designation,
-          department: emp.department,
-          employeeType: emp.employeeType,
+          employeeId: employeeId,
+          employeeCode: employeeCode,
+          employeeName: employeeName,
+          designation: designation,
+          department: department,
+          employeeType: employeeType,
           grossSalary: grossSalary,
           ctc: ctc,
           joiningDate: _joiningDate,

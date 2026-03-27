@@ -23,11 +23,16 @@ class GenerateSalarySlipDialog extends ConsumerStatefulWidget {
 class _GenerateSalarySlipDialogState
     extends ConsumerState<GenerateSalarySlipDialog> {
   Employee? _selectedEmployee;
+  bool _useManualEmployee = false;
   int _selectedMonth = DateTime.now().month;
   int _selectedYear = DateTime.now().year;
   bool _autoCalc = true;
   bool _isGenerating = false;
 
+  final _employeeNameController = TextEditingController();
+  final _employeeCodeController = TextEditingController();
+  final _designationController = TextEditingController();
+  final _departmentController = TextEditingController();
   final _ctcController = TextEditingController();
   final _basicController = TextEditingController();
   final _hraController = TextEditingController();
@@ -39,12 +44,25 @@ class _GenerateSalarySlipDialogState
   final _paidDaysController = TextEditingController();
   final _branchController = TextEditingController();
   final _payModeController = TextEditingController(text: 'NEFT');
+  final _bankNameController = TextEditingController();
+  final _bankAccountNumberController = TextEditingController();
+  final _ifscController = TextEditingController();
+  String _manualEmployeeType = 'office';
 
   @override
   void initState() {
     super.initState();
     if (widget.preselectedEmployee != null) {
       _selectedEmployee = widget.preselectedEmployee;
+      _employeeNameController.text = widget.preselectedEmployee!.fullName;
+      _employeeCodeController.text = widget.preselectedEmployee!.employeeCode;
+      _designationController.text = widget.preselectedEmployee!.designation;
+      _departmentController.text = widget.preselectedEmployee!.department;
+      _bankNameController.text = widget.preselectedEmployee!.bankName ?? '';
+      _bankAccountNumberController.text =
+          widget.preselectedEmployee!.bankAccountNumber ?? '';
+      _ifscController.text = widget.preselectedEmployee!.ifscCode ?? '';
+      _manualEmployeeType = widget.preselectedEmployee!.employeeType;
     }
     // Default month days
     _paidDaysController.text = DateTime(
@@ -56,6 +74,10 @@ class _GenerateSalarySlipDialogState
 
   @override
   void dispose() {
+    _employeeNameController.dispose();
+    _employeeCodeController.dispose();
+    _designationController.dispose();
+    _departmentController.dispose();
     _ctcController.dispose();
     _basicController.dispose();
     _hraController.dispose();
@@ -67,6 +89,9 @@ class _GenerateSalarySlipDialogState
     _paidDaysController.dispose();
     _branchController.dispose();
     _payModeController.dispose();
+    _bankNameController.dispose();
+    _bankAccountNumberController.dispose();
+    _ifscController.dispose();
     super.dispose();
   }
 
@@ -186,42 +211,216 @@ class _GenerateSalarySlipDialogState
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Employee Selection
-                    Text('Employee *', style: AppTypography.formLabel),
+                    Text('Salary Slip For', style: AppTypography.formLabel),
                     const SizedBox(height: 8),
-                    DropdownButtonFormField<Employee>(
-                      value: _selectedEmployee,
-                      isExpanded: true,
-                      decoration: InputDecoration(
-                        hintText: 'Select employee',
-                        prefixIcon: const Icon(AppIcons.user, size: 18),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                    SegmentedButton<bool>(
+                      segments: const [
+                        ButtonSegment<bool>(
+                          value: false,
+                          icon: Icon(AppIcons.user, size: 16),
+                          label: Text('Existing Employee'),
                         ),
-                      ),
-                      items: activeEmployees.map((emp) {
-                        return DropdownMenuItem(
-                          value: emp,
-                          child: Text(
-                            '${emp.employeeCode} - ${emp.fullName} (${emp.designation})',
-                            style: AppTypography.bodyMedium,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        );
-                      }).toList(),
-                      onChanged: (val) {
-                        setState(() => _selectedEmployee = val);
-                        if (val != null) {
-                          // Load pending advances for this employee
-                          _loadEmployeeAdvances(val.id);
-                          // Recalculate if CTC is provided
-                          if (_ctcController.text.isNotEmpty) {
-                            _recalcFromCTC(
-                              double.tryParse(_ctcController.text) ?? 0,
-                            );
-                          }
-                        }
+                        ButtonSegment<bool>(
+                          value: true,
+                          icon: Icon(AppIcons.edit, size: 16),
+                          label: Text('Manual Entry'),
+                        ),
+                      ],
+                      selected: {_useManualEmployee},
+                      onSelectionChanged: (selection) {
+                        setState(() {
+                          _useManualEmployee = selection.first;
+                        });
                       },
                     ),
+                    const SizedBox(height: 18),
+
+                    if (!_useManualEmployee) ...[
+                      Text('Employee *', style: AppTypography.formLabel),
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<Employee>(
+                        value: _selectedEmployee,
+                        isExpanded: true,
+                        decoration: InputDecoration(
+                          hintText: 'Select employee',
+                          prefixIcon: const Icon(AppIcons.user, size: 18),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        items: activeEmployees.map((emp) {
+                          return DropdownMenuItem(
+                            value: emp,
+                            child: Text(
+                              '${emp.employeeCode} - ${emp.fullName} (${emp.designation})',
+                              style: AppTypography.bodyMedium,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          setState(() {
+                            _selectedEmployee = val;
+                            if (val != null) {
+                              _employeeNameController.text = val.fullName;
+                              _employeeCodeController.text = val.employeeCode;
+                              _designationController.text = val.designation;
+                              _departmentController.text = val.department;
+                              _bankNameController.text = val.bankName ?? '';
+                              _bankAccountNumberController.text =
+                                  val.bankAccountNumber ?? '';
+                              _ifscController.text = val.ifscCode ?? '';
+                              _manualEmployeeType = val.employeeType;
+                            }
+                          });
+                          if (val != null) {
+                            _loadEmployeeAdvances(val.id);
+                            if (_ctcController.text.isNotEmpty) {
+                              _recalcFromCTC(
+                                double.tryParse(_ctcController.text) ?? 0,
+                              );
+                            }
+                          }
+                        },
+                      ),
+                    ] else ...[
+                      Text('Employee Details *', style: AppTypography.formLabel),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _employeeNameController,
+                        decoration: InputDecoration(
+                          hintText: 'Employee name',
+                          prefixIcon: const Icon(AppIcons.user, size: 18),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _employeeCodeController,
+                              decoration: InputDecoration(
+                                hintText: 'Employee code',
+                                prefixIcon: const Icon(
+                                  AppIcons.employeeMaster,
+                                  size: 18,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              value: _manualEmployeeType,
+                              decoration: InputDecoration(
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              items: const [
+                                DropdownMenuItem(
+                                  value: 'office',
+                                  child: Text('Office Employee'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'factory',
+                                  child: Text('Factory Employee'),
+                                ),
+                              ],
+                              onChanged: (val) {
+                                if (val == null) return;
+                                setState(() => _manualEmployeeType = val);
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _designationController,
+                              decoration: InputDecoration(
+                                hintText: 'Designation',
+                                prefixIcon: const Icon(
+                                  AppIcons.designation,
+                                  size: 18,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextField(
+                              controller: _departmentController,
+                              decoration: InputDecoration(
+                                hintText: 'Department',
+                                prefixIcon: const Icon(
+                                  AppIcons.department,
+                                  size: 18,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _bankNameController,
+                              decoration: InputDecoration(
+                                hintText: 'Bank name',
+                                prefixIcon: const Icon(AppIcons.bank, size: 18),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextField(
+                              controller: _bankAccountNumberController,
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                              ],
+                              decoration: InputDecoration(
+                                hintText: 'Bank account number',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _ifscController,
+                        decoration: InputDecoration(
+                          hintText: 'IFSC code',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 18),
 
                     // Month & Year
@@ -616,17 +815,64 @@ class _GenerateSalarySlipDialogState
   }
 
   void _generateSlip() {
-    if (_selectedEmployee == null) {
+    if (!_useManualEmployee && _selectedEmployee == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select an employee')),
+      );
+      return;
+    }
+    if (_useManualEmployee && _employeeNameController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter employee name')),
+      );
+      return;
+    }
+    if (_useManualEmployee && _designationController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter designation')),
+      );
+      return;
+    }
+    if (_useManualEmployee && _departmentController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter department')),
       );
       return;
     }
 
     setState(() => _isGenerating = true);
 
+    final employee = _useManualEmployee
+        ? Employee(
+            id: 'manual-${DateTime.now().millisecondsSinceEpoch}',
+            employeeCode: _employeeCodeController.text.trim().isEmpty
+                ? 'MAN-${_selectedYear}-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}'
+                : _employeeCodeController.text.trim(),
+            firstName: _extractFirstName(_employeeNameController.text.trim()),
+            lastName: _extractLastName(_employeeNameController.text.trim()),
+            email: '',
+            phone: '',
+            employeeType: _manualEmployeeType,
+            department: _departmentController.text.trim(),
+            designation: _designationController.text.trim(),
+            joiningDate: DateTime(_selectedYear, _selectedMonth, 1),
+            bankName: _bankNameController.text.trim().isEmpty
+                ? null
+                : _bankNameController.text.trim(),
+            bankAccountNumber: _bankAccountNumberController.text.trim().isEmpty
+                ? null
+                : _bankAccountNumberController.text.trim(),
+            ifscCode: _ifscController.text.trim().isEmpty
+                ? null
+                : _ifscController.text.trim(),
+            status: 'Active',
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+          )
+        : _selectedEmployee!;
+
     final data = SalarySlipData(
-      employee: _selectedEmployee!,
+      employee: employee,
       month: _selectedMonth,
       year: _selectedYear,
       paidDays: int.tryParse(_paidDaysController.text) ?? _monthDays,
@@ -644,7 +890,7 @@ class _GenerateSalarySlipDialogState
 
     // Record advance deduction if advance amount is present
     final advanceAmount = double.tryParse(_advanceController.text) ?? 0;
-    if (advanceAmount > 0 && _selectedEmployee != null) {
+    if (!_useManualEmployee && advanceAmount > 0 && _selectedEmployee != null) {
       _recordAdvanceDeduction(_selectedEmployee!.id, advanceAmount);
     }
 
@@ -704,5 +950,16 @@ class _GenerateSalarySlipDialogState
       'December',
     ];
     return months[month - 1];
+  }
+
+  String _extractFirstName(String fullName) {
+    final parts = fullName.trim().split(RegExp(r'\s+'));
+    return parts.isEmpty ? '' : parts.first;
+  }
+
+  String _extractLastName(String fullName) {
+    final parts = fullName.trim().split(RegExp(r'\s+'));
+    if (parts.length <= 1) return '';
+    return parts.sublist(1).join(' ');
   }
 }

@@ -35,15 +35,24 @@ class _AddEmployeeDrawerState extends State<AddEmployeeDrawer> {
   final _phoneController = TextEditingController();
   final _alternatePhoneController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _departmentController = TextEditingController();
+  final _designationController = TextEditingController();
+  final _bankNameController = TextEditingController();
+  final _currentAddressController = TextEditingController();
+  final _currentCityController = TextEditingController();
+  final _currentPincodeController = TextEditingController();
+  final _bankAccountNumberController = TextEditingController();
+  final _ifscCodeController = TextEditingController();
+  final _panNumberController = TextEditingController();
+  final _aadhaarNumberController = TextEditingController();
 
   // Form State
   String? _employeeType;
-  String? _department;
-  String? _designation;
   DateTime? _joiningDate;
   DateTime? _dateOfBirth;
   String? _gender;
   String? _maritalStatus;
+  String? _currentState;
 
   final List<_StepData> _steps = const [
     _StepData(title: 'Basic Info', icon: AppIcons.user),
@@ -55,17 +64,14 @@ class _AddEmployeeDrawerState extends State<AddEmployeeDrawer> {
   @override
   void initState() {
     super.initState();
-    if (widget.employee != null) {
-      _firstNameController.text = widget.employee!.firstName;
-      _lastNameController.text = widget.employee!.lastName;
-      _emailController.text = widget.employee!.email;
-      _phoneController.text = widget.employee!.phone;
-      _employeeType = widget.employee!.employeeType;
-      _department = widget.employee!.department;
-      _designation = widget.employee!.designation;
-      _joiningDate = widget.employee!.joiningDate;
-      _dateOfBirth = widget.employee!.dateOfBirth;
-      _gender = widget.employee!.gender;
+    _populateForm(widget.employee);
+  }
+
+  @override
+  void didUpdateWidget(covariant AddEmployeeDrawer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.employee?.id != widget.employee?.id) {
+      _populateForm(widget.employee);
     }
   }
 
@@ -76,7 +82,44 @@ class _AddEmployeeDrawerState extends State<AddEmployeeDrawer> {
     _emailController.dispose();
     _phoneController.dispose();
     _alternatePhoneController.dispose();
+    _passwordController.dispose();
+    _departmentController.dispose();
+    _designationController.dispose();
+    _bankNameController.dispose();
+    _currentAddressController.dispose();
+    _currentCityController.dispose();
+    _currentPincodeController.dispose();
+    _bankAccountNumberController.dispose();
+    _ifscCodeController.dispose();
+    _panNumberController.dispose();
+    _aadhaarNumberController.dispose();
     super.dispose();
+  }
+
+  void _populateForm(Employee? employee) {
+    _firstNameController.text = employee?.firstName ?? '';
+    _lastNameController.text = employee?.lastName ?? '';
+    _emailController.text = employee?.email ?? '';
+    _phoneController.text = employee?.phone ?? '';
+    _alternatePhoneController.text = employee?.alternatePhone ?? '';
+    _passwordController.clear();
+    _departmentController.text = employee?.department ?? '';
+    _designationController.text = employee?.designation ?? '';
+    _bankNameController.text = employee?.bankName ?? '';
+    _currentAddressController.text = employee?.currentAddress ?? '';
+    _currentCityController.text = employee?.currentCity ?? '';
+    _currentPincodeController.text = employee?.currentPincode ?? '';
+    _bankAccountNumberController.text = employee?.bankAccountNumber ?? '';
+    _ifscCodeController.text = employee?.ifscCode ?? '';
+    _panNumberController.text = employee?.panNumber ?? '';
+    _aadhaarNumberController.text = employee?.aadhaarNumber ?? '';
+
+    _employeeType = employee?.employeeType;
+    _joiningDate = employee?.joiningDate;
+    _dateOfBirth = employee?.dateOfBirth;
+    _gender = employee?.gender;
+    _maritalStatus = employee?.maritalStatus;
+    _currentState = employee?.currentState;
   }
 
   @override
@@ -289,6 +332,7 @@ class _AddEmployeeDrawerState extends State<AddEmployeeDrawer> {
                 controller: _firstNameController,
                 isRequired: true,
                 prefixIcon: AppIcons.user,
+                validator: _requiredValidator,
               ),
             ),
             const SizedBox(width: AppSpacing.md),
@@ -298,6 +342,7 @@ class _AddEmployeeDrawerState extends State<AddEmployeeDrawer> {
                 hint: 'Enter last name',
                 controller: _lastNameController,
                 isRequired: true,
+                validator: _requiredValidator,
               ),
             ),
           ],
@@ -368,28 +413,24 @@ class _AddEmployeeDrawerState extends State<AddEmployeeDrawer> {
         const SizedBox(height: AppSpacing.lg),
 
         // Department
-        AppDropdownField<String>(
+        AppTextField(
           label: 'Department',
-          hint: 'Select department',
-          value: _department,
-          items: AppConstants.departments,
-          itemLabel: (item) => item,
-          onChanged: (value) => setState(() => _department = value),
+          hint: 'Enter department',
+          controller: _departmentController,
           isRequired: true,
           prefixIcon: AppIcons.department,
+          validator: _requiredValidator,
         ),
         const SizedBox(height: AppSpacing.formFieldSpacing),
 
         // Designation
-        AppDropdownField<String>(
+        AppTextField(
           label: 'Designation',
-          hint: 'Select designation',
-          value: _designation,
-          items: AppConstants.designations,
-          itemLabel: (item) => item,
-          onChanged: (value) => setState(() => _designation = value),
+          hint: 'Enter designation',
+          controller: _designationController,
           isRequired: true,
           prefixIcon: AppIcons.designation,
+          validator: _requiredValidator,
         ),
         const SizedBox(height: AppSpacing.formFieldSpacing),
 
@@ -454,6 +495,12 @@ class _AddEmployeeDrawerState extends State<AddEmployeeDrawer> {
           keyboardType: TextInputType.emailAddress,
           isRequired: true,
           prefixIcon: AppIcons.email,
+          validator: (value) {
+            final text = value?.trim() ?? '';
+            if (text.isEmpty) return 'This field is required';
+            if (!text.contains('@')) return 'Enter a valid email address';
+            return null;
+          },
         ),
         const SizedBox(height: AppSpacing.formFieldSpacing),
 
@@ -467,6 +514,16 @@ class _AddEmployeeDrawerState extends State<AddEmployeeDrawer> {
               widget.employee == null, // password required for new users
           obscureText: true,
           prefixIcon: AppIcons.lock,
+          validator: (value) {
+            final text = value?.trim() ?? '';
+            if (widget.employee == null && text.isEmpty) {
+              return 'This field is required';
+            }
+            if (text.isNotEmpty && text.length < 8) {
+              return 'Password must be at least 8 characters';
+            }
+            return null;
+          },
         ),
         if (widget.employee == null)
           Padding(
@@ -491,6 +548,7 @@ class _AddEmployeeDrawerState extends State<AddEmployeeDrawer> {
                 keyboardType: TextInputType.phone,
                 isRequired: true,
                 prefixIcon: AppIcons.phone,
+                validator: _requiredValidator,
               ),
             ),
             const SizedBox(width: AppSpacing.md),
@@ -514,6 +572,7 @@ class _AddEmployeeDrawerState extends State<AddEmployeeDrawer> {
         AppTextField(
           label: 'Current Address',
           hint: 'Enter current address',
+          controller: _currentAddressController,
           maxLines: 3,
           prefixIcon: AppIcons.address,
         ),
@@ -522,24 +581,30 @@ class _AddEmployeeDrawerState extends State<AddEmployeeDrawer> {
         // City, State, Pincode
         Row(
           children: [
-            const Expanded(
-              child: AppTextField(label: 'City', hint: 'Enter city'),
+            Expanded(
+              child: AppTextField(
+                label: 'City',
+                hint: 'Enter city',
+                controller: _currentCityController,
+              ),
             ),
             const SizedBox(width: AppSpacing.md),
             Expanded(
               child: AppDropdownField<String>(
                 label: 'State',
                 hint: 'Select state',
+                value: _currentState,
                 items: AppConstants.indianStates,
                 itemLabel: (item) => item,
-                onChanged: (value) {},
+                onChanged: (value) => setState(() => _currentState = value),
               ),
             ),
             const SizedBox(width: AppSpacing.md),
-            const Expanded(
+            Expanded(
               child: AppTextField(
                 label: 'Pincode',
                 hint: 'Enter pincode',
+                controller: _currentPincodeController,
                 keyboardType: TextInputType.number,
               ),
             ),
@@ -557,30 +622,33 @@ class _AddEmployeeDrawerState extends State<AddEmployeeDrawer> {
         const SizedBox(height: AppSpacing.lg),
 
         // Bank Name
-        AppDropdownField<String>(
+        AppTextField(
           label: 'Bank Name',
-          hint: 'Select bank',
-          items: AppConstants.banks,
-          itemLabel: (item) => item,
-          onChanged: (value) {},
+          hint: 'Enter bank name',
+          controller: _bankNameController,
           prefixIcon: AppIcons.bank,
         ),
         const SizedBox(height: AppSpacing.formFieldSpacing),
 
         // Account Number & IFSC
-        const Row(
+        Row(
           children: [
             Expanded(
               flex: 2,
               child: AppTextField(
                 label: 'Account Number',
                 hint: 'Enter account number',
+                controller: _bankAccountNumberController,
                 keyboardType: TextInputType.number,
               ),
             ),
             SizedBox(width: AppSpacing.md),
             Expanded(
-              child: AppTextField(label: 'IFSC Code', hint: 'Enter IFSC'),
+              child: AppTextField(
+                label: 'IFSC Code',
+                hint: 'Enter IFSC',
+                controller: _ifscCodeController,
+              ),
             ),
           ],
         ),
@@ -590,12 +658,13 @@ class _AddEmployeeDrawerState extends State<AddEmployeeDrawer> {
         const SizedBox(height: AppSpacing.lg),
 
         // PAN & Aadhaar
-        const Row(
+        Row(
           children: [
             Expanded(
               child: AppTextField(
                 label: 'PAN Number',
                 hint: 'Enter PAN number',
+                controller: _panNumberController,
               ),
             ),
             SizedBox(width: AppSpacing.md),
@@ -603,6 +672,7 @@ class _AddEmployeeDrawerState extends State<AddEmployeeDrawer> {
               child: AppTextField(
                 label: 'Aadhaar Number',
                 hint: 'Enter Aadhaar number',
+                controller: _aadhaarNumberController,
                 keyboardType: TextInputType.number,
               ),
             ),
@@ -683,12 +753,44 @@ class _AddEmployeeDrawerState extends State<AddEmployeeDrawer> {
                         ? null
                         : _alternatePhoneController.text.trim(),
                     employeeType: _employeeType ?? 'office',
-                    department: _department ?? 'General',
-                    designation: _designation ?? 'Employee',
+                    department: _departmentController.text.trim().isEmpty
+                        ? 'General'
+                        : _departmentController.text.trim(),
+                    designation: _designationController.text.trim().isEmpty
+                        ? 'Employee'
+                        : _designationController.text.trim(),
+                    bankName: _bankNameController.text.trim().isEmpty
+                        ? null
+                        : _bankNameController.text.trim(),
+                    bankAccountNumber:
+                        _bankAccountNumberController.text.trim().isEmpty
+                        ? null
+                        : _bankAccountNumberController.text.trim(),
+                    ifscCode: _ifscCodeController.text.trim().isEmpty
+                        ? null
+                        : _ifscCodeController.text.trim(),
+                    panNumber: _panNumberController.text.trim().isEmpty
+                        ? null
+                        : _panNumberController.text.trim(),
+                    aadhaarNumber: _aadhaarNumberController.text.trim().isEmpty
+                        ? null
+                        : _aadhaarNumberController.text.trim(),
                     joiningDate: _joiningDate ?? DateTime.now(),
                     dateOfBirth: _dateOfBirth,
                     gender: _gender,
                     maritalStatus: _maritalStatus,
+                    currentAddress:
+                        _currentAddressController.text.trim().isEmpty
+                        ? null
+                        : _currentAddressController.text.trim(),
+                    currentCity: _currentCityController.text.trim().isEmpty
+                        ? null
+                        : _currentCityController.text.trim(),
+                    currentState: _currentState,
+                    currentPincode:
+                        _currentPincodeController.text.trim().isEmpty
+                        ? null
+                        : _currentPincodeController.text.trim(),
                     status: widget.employee?.status ?? 'Active',
                     createdAt: widget.employee?.createdAt ?? DateTime.now(),
                     updatedAt: DateTime.now(),
@@ -704,6 +806,13 @@ class _AddEmployeeDrawerState extends State<AddEmployeeDrawer> {
         ],
       ),
     );
+  }
+
+  String? _requiredValidator(String? value) {
+    if ((value?.trim() ?? '').isEmpty) {
+      return 'This field is required';
+    }
+    return null;
   }
 }
 

@@ -48,6 +48,8 @@ class _GenerateSalarySlipDialogState
   final _bankAccountNumberController = TextEditingController();
   final _ifscController = TextEditingController();
   String _manualEmployeeType = 'office';
+  bool _isPfApplicable = true;
+  bool _isEsicApplicable = true;
 
   @override
   void initState() {
@@ -63,6 +65,8 @@ class _GenerateSalarySlipDialogState
           widget.preselectedEmployee!.bankAccountNumber ?? '';
       _ifscController.text = widget.preselectedEmployee!.ifscCode ?? '';
       _manualEmployeeType = widget.preselectedEmployee!.employeeType;
+      _isPfApplicable = widget.preselectedEmployee!.isPfApplicable;
+      _isEsicApplicable = widget.preselectedEmployee!.isEsicApplicable;
     }
     // Default month days
     _paidDaysController.text = DateTime(
@@ -97,20 +101,17 @@ class _GenerateSalarySlipDialogState
 
   void _recalcFromCTC(double ctc) {
     if (!_autoCalc) return;
-    final basic = (ctc * 0.55).round();
-    final hra = (ctc * 0.275).round();
-    final sa = ctc.round() - basic - hra;
+    final gross = _calculateGrossFromCtc(ctc);
+    final basic = (gross * 0.60).round();
+    final hra = gross.round() - basic;
+    final sa = 0;
     _basicController.text = basic.toString();
     _hraController.text = hra.toString();
     _saController.text = sa.toString();
 
     // Auto PF/ESIC
-    final pf = _selectedEmployee?.isPfApplicable == true
-        ? (basic * 0.12).round()
-        : 0;
-    final esic = _selectedEmployee?.isEsicApplicable == true
-        ? ((basic + hra + sa) * 0.0075).round()
-        : 0;
+    final pf = _isPfApplicable ? (basic * 0.12).round() : 0;
+    final esic = _isEsicApplicable ? ((basic + hra + sa) * 0.0075).round() : 0;
     _pfController.text = pf.toString();
     _esicController.text = esic.toString();
     setState(() {});
@@ -271,6 +272,8 @@ class _GenerateSalarySlipDialogState
                                   val.bankAccountNumber ?? '';
                               _ifscController.text = val.ifscCode ?? '';
                               _manualEmployeeType = val.employeeType;
+                              _isPfApplicable = val.isPfApplicable;
+                              _isEsicApplicable = val.isEsicApplicable;
                             }
                           });
                           if (val != null) {
@@ -422,6 +425,50 @@ class _GenerateSalarySlipDialogState
                       ),
                     ],
                     const SizedBox(height: 18),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(
+                              'PF Applicable',
+                              style: AppTypography.labelMedium,
+                            ),
+                            value: _isPfApplicable,
+                            activeColor: AppColors.primary,
+                            onChanged: (value) {
+                              setState(() {
+                                _isPfApplicable = value;
+                                _recalcFromCTC(
+                                  double.tryParse(_ctcController.text) ?? 0,
+                                );
+                              });
+                            },
+                          ),
+                        ),
+                        Expanded(
+                          child: SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(
+                              'ESIC Applicable',
+                              style: AppTypography.labelMedium,
+                            ),
+                            value: _isEsicApplicable,
+                            activeColor: AppColors.primary,
+                            onChanged: (value) {
+                              setState(() {
+                                _isEsicApplicable = value;
+                                _recalcFromCTC(
+                                  double.tryParse(_ctcController.text) ?? 0,
+                                );
+                              });
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
 
                     // Month & Year
                     Row(
@@ -592,7 +639,7 @@ class _GenerateSalarySlipDialogState
 
                           // CTC
                           Text(
-                            'CTC / Gross per month',
+                            'Monthly CTC',
                             style: AppTypography.formLabel,
                           ),
                           const SizedBox(height: 6),
@@ -865,6 +912,8 @@ class _GenerateSalarySlipDialogState
             ifscCode: _ifscController.text.trim().isEmpty
                 ? null
                 : _ifscController.text.trim(),
+            isPfApplicable: _isPfApplicable,
+            isEsicApplicable: _isEsicApplicable,
             status: 'Active',
             createdAt: DateTime.now(),
             updatedAt: DateTime.now(),
@@ -950,6 +999,14 @@ class _GenerateSalarySlipDialogState
       'December',
     ];
     return months[month - 1];
+  }
+
+  double _calculateGrossFromCtc(double ctc) {
+    final employerFactor =
+        1 +
+        (_isPfApplicable ? 0.072 : 0) +
+        (_isEsicApplicable ? 0.0325 : 0);
+    return employerFactor == 0 ? ctc : ctc / employerFactor;
   }
 
   String _extractFirstName(String fullName) {

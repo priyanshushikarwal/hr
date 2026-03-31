@@ -1,5 +1,39 @@
 import 'package:equatable/equatable.dart';
 
+DateTime _toIndiaOfficeTime(DateTime source) {
+  final utc = source.toUtc();
+  return DateTime(
+    utc.year,
+    utc.month,
+    utc.day,
+    utc.hour,
+    utc.minute,
+    utc.second,
+    utc.millisecond,
+    utc.microsecond,
+  ).add(const Duration(hours: 5, minutes: 30));
+}
+
+String _normalizeShiftStatus(String rawStatus, DateTime? checkIn) {
+  final normalizedRaw = rawStatus.toLowerCase().trim();
+  if (checkIn == null) return normalizedRaw;
+
+  final officeCheckIn = _toIndiaOfficeTime(checkIn);
+
+  if (normalizedRaw == 'present' ||
+      normalizedRaw == 'late' ||
+      normalizedRaw == 'half_day' ||
+      normalizedRaw == 'half day') {
+    final minutesSinceMidnight =
+        (officeCheckIn.hour * 60) + officeCheckIn.minute;
+    if (minutesSinceMidnight >= 11 * 60) return 'half_day';
+    if (minutesSinceMidnight > (9 * 60 + 15)) return 'late';
+    return 'present';
+  }
+
+  return normalizedRaw;
+}
+
 /// Attendance Record Model
 class AttendanceRecord extends Equatable {
   final String id;
@@ -7,7 +41,7 @@ class AttendanceRecord extends Equatable {
   final String employeeCode;
   final DateTime date;
   final String
-  status; // 'present', 'absent', 'half_day', 'leave', 'holiday', 'weekend'
+  status; // 'present', 'late', 'absent', 'half_day', 'half day', 'leave', 'holiday', 'weekend'
   final String? leaveType;
 
   // Time tracking
@@ -62,9 +96,10 @@ class AttendanceRecord extends Equatable {
   });
 
   bool get isPresent => status == 'present';
+  bool get isLate => status == 'late';
   bool get isAbsent => status == 'absent';
   bool get isOnLeave => status == 'leave';
-  bool get isHalfDay => status == 'half_day';
+  bool get isHalfDay => status == 'half_day' || status == 'half day';
   bool get isVisit => status == 'visit';
   bool get isHoliday => status == 'holiday';
   bool get isWeekend => status == 'weekend';
@@ -146,16 +181,22 @@ class AttendanceRecord extends Equatable {
   }
 
   factory AttendanceRecord.fromJson(Map<String, dynamic> json) {
+    final parsedCheckIn = json['checkIn'] != null
+        ? DateTime.parse(json['checkIn'] as String)
+        : null;
+    final normalizedStatus = _normalizeShiftStatus(
+      json['status'] as String,
+      parsedCheckIn,
+    );
+
     return AttendanceRecord(
       id: json['id'] as String,
       employeeId: json['employeeId'] as String,
       employeeCode: json['employeeCode'] as String,
       date: DateTime.parse(json['date'] as String),
-      status: json['status'] as String,
+      status: normalizedStatus,
       leaveType: json['leaveType'] as String?,
-      checkIn: json['checkIn'] != null
-          ? DateTime.parse(json['checkIn'] as String)
-          : null,
+      checkIn: parsedCheckIn,
       checkOut: json['checkOut'] != null
           ? DateTime.parse(json['checkOut'] as String)
           : null,
@@ -217,6 +258,7 @@ class AttendanceSummary extends Equatable {
   final int year;
   final int totalDays;
   final int presentDays;
+  final int lateDays;
   final int absentDays;
   final int halfDays;
   final int leaveDays;
@@ -233,6 +275,7 @@ class AttendanceSummary extends Equatable {
     required this.year,
     required this.totalDays,
     required this.presentDays,
+    this.lateDays = 0,
     required this.absentDays,
     this.halfDays = 0,
     this.leaveDays = 0,
@@ -246,12 +289,12 @@ class AttendanceSummary extends Equatable {
   double get attendancePercentage {
     final workingDays = totalDays - holidays - weekends;
     if (workingDays == 0) return 0;
-    return ((presentDays + (halfDays * 0.5)) / workingDays) * 100;
+    return (((presentDays + lateDays) + (halfDays * 0.5)) / workingDays) * 100;
   }
 
   int get workingDays => totalDays - holidays - weekends;
 
-  double get effectivePresentDays => presentDays + (halfDays * 0.5);
+  double get effectivePresentDays => presentDays + lateDays + (halfDays * 0.5);
 
   @override
   List<Object?> get props => [
@@ -261,6 +304,7 @@ class AttendanceSummary extends Equatable {
     year,
     totalDays,
     presentDays,
+    lateDays,
     absentDays,
     halfDays,
     leaveDays,

@@ -24,44 +24,40 @@ class AttendanceRepository {
     String? employeeId,
     required bool isOnline,
   }) async {
-    if (isOnline) {
-      try {
-        final startDate = DateTime(year, month, 1);
-        final endDate = DateTime(year, month + 1, 0, 23, 59, 59);
+    try {
+      final startDate = DateTime(year, month, 1);
+      final endDate = DateTime(year, month + 1, 0, 23, 59, 59);
 
-        final queries = <String>[
-          Query.greaterThanEqual('date', startDate.toIso8601String()),
-          Query.lessThanEqual('date', endDate.toIso8601String()),
-          Query.limit(100),
-          Query.orderDesc('date'),
-        ];
-        if (employeeId != null)
-          queries.add(Query.equal('employeeId', employeeId));
-
-        final response = await _databases.listDocuments(
-          databaseId: AppwriteConfig.databaseId,
-          collectionId: _collectionId,
-          queries: queries,
-        );
-
-        final records = response.documents
-            .map(
-              (doc) => AttendanceRecord.fromJson({...doc.data, 'id': doc.$id}),
-            )
-            .toList();
-
-        // Cache to Hive
-        final box = HiveService.getBox(_boxName);
-        for (final r in records) {
-          await box.put(r.id, r.toJson());
-        }
-
-        return records;
-      } on AppwriteException catch (e) {
-        print('AttendanceRepository error: ${e.message}');
-        return _getFromHive(month: month, year: year, employeeId: employeeId);
+      final queries = <String>[
+        Query.greaterThanEqual('date', startDate.toIso8601String()),
+        Query.lessThanEqual('date', endDate.toIso8601String()),
+        Query.limit(100),
+        Query.orderDesc('date'),
+      ];
+      if (employeeId != null) {
+        queries.add(Query.equal('employeeId', employeeId));
       }
-    } else {
+
+      final response = await _databases.listDocuments(
+        databaseId: AppwriteConfig.databaseId,
+        collectionId: _collectionId,
+        queries: queries,
+      );
+
+      final records = response.documents
+          .map(
+            (doc) => AttendanceRecord.fromJson({...doc.data, 'id': doc.$id}),
+          )
+          .toList();
+
+      final box = HiveService.getBox(_boxName);
+      for (final record in records) {
+        await box.put(record.id, record.toJson());
+      }
+
+      return records;
+    } on AppwriteException catch (e) {
+      print('AttendanceRepository remote read failed: ${e.message}');
       return _getFromHive(month: month, year: year, employeeId: employeeId);
     }
   }
@@ -286,6 +282,7 @@ class AttendanceRepository {
         .toList();
     final totalDays = DateTime(year, month + 1, 0).day;
     final presentDays = empRecords.where((r) => r.isPresent).length;
+    final lateDays = empRecords.where((r) => r.isLate).length;
     final absentDays = empRecords.where((r) => r.isAbsent).length;
     final halfDays = empRecords.where((r) => r.isHalfDay).length;
     final leaveDays = empRecords.where((r) => r.isOnLeave).length;
@@ -307,6 +304,7 @@ class AttendanceRepository {
       year: year,
       totalDays: totalDays,
       presentDays: presentDays,
+      lateDays: lateDays,
       absentDays: absentDays,
       halfDays: halfDays,
       leaveDays: leaveDays,

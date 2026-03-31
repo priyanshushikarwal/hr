@@ -139,8 +139,14 @@ class DashboardScreen extends ConsumerWidget {
       error: (_, __) => <AttendanceRecord>[],
     );
 
-    final todayKey = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    final todayRecord = records.where((r) => r.date == todayKey).toList();
+    final now = DateTime.now();
+    final todayRecord = records.where((r) {
+      final date = DateTime.tryParse(r.date)?.toLocal();
+      return date != null &&
+          date.year == now.year &&
+          date.month == now.month &&
+          date.day == now.day;
+    }).toList();
     final todayStatus = todayRecord.isNotEmpty
         ? todayRecord.first.status
         : 'Not Marked';
@@ -148,11 +154,11 @@ class DashboardScreen extends ConsumerWidget {
     final presentDays = records
         .where((r) => r.status.toLowerCase() == 'present')
         .length;
+    final lateDays = records
+        .where((r) => r.status.toLowerCase() == 'late')
+        .length;
     final leavesTaken = leaveState.requests
         .where((l) => l.status == 'approved')
-        .length;
-    final pendingLeaves = leaveState.requests
-        .where((l) => l.status == 'pending')
         .length;
 
     return Column(
@@ -178,16 +184,16 @@ class DashboardScreen extends ConsumerWidget {
         Row(
           children: [
             _StatCard(
-              title: 'Leaves Taken',
-              value: leavesTaken.toString(),
-              icon: Icons.event_busy_outlined,
+              title: 'Late Days',
+              value: lateDays.toString(),
+              icon: Icons.timer_outlined,
               color: AppColors.warning,
             ),
             const SizedBox(width: 12),
             _StatCard(
-              title: 'Pending Requests',
-              value: pendingLeaves.toString(),
-              icon: Icons.hourglass_empty_rounded,
+              title: 'Leaves Taken',
+              value: leavesTaken.toString(),
+              icon: Icons.event_busy_outlined,
               color: AppColors.info,
             ),
           ],
@@ -446,6 +452,8 @@ class DashboardScreen extends ConsumerWidget {
     switch (status.toLowerCase()) {
       case 'present':
         return AppColors.statusPresent;
+      case 'late':
+        return AppColors.warning;
       case 'absent':
         return AppColors.statusAbsent;
       case 'half day':

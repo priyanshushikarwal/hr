@@ -42,6 +42,8 @@ class _CreateOfferLetterDialogState
   String? _error;
   bool _autoCalc = true;
   String _manualEmployeeType = 'office';
+  bool _isPfApplicable = true;
+  bool _isEsicApplicable = true;
 
   bool get _isEditing => widget.existingLetter != null;
 
@@ -58,6 +60,8 @@ class _CreateOfferLetterDialogState
       _designationController.text = l.designation;
       _departmentController.text = l.department;
       _manualEmployeeType = l.employeeType.isEmpty ? 'office' : l.employeeType;
+      _isPfApplicable = l.isPfApplicable;
+      _isEsicApplicable = l.isEsicApplicable;
       _useManualCandidate = true;
       // Auto-calculate salary components from CTC
       _recalcSalary(l.ctc);
@@ -66,9 +70,10 @@ class _CreateOfferLetterDialogState
 
   void _recalcSalary(double ctc) {
     if (!_autoCalc) return;
-    final basic = (ctc * 0.50).round();
-    final hra = (ctc * 0.25).round();
-    final sa = ctc.round() - basic - hra;
+    final gross = _calculateGrossFromCtc(ctc);
+    final basic = (gross * 0.60).round();
+    final hra = gross.round() - basic;
+    final sa = 0;
     _basicController.text = basic.toString();
     _hraController.text = hra.toString();
     _saController.text = sa.toString();
@@ -312,8 +317,13 @@ class _CreateOfferLetterDialogState
                             ),
                           );
                         }).toList(),
-                        onChanged: (val) =>
-                            setState(() => _selectedEmployee = val),
+                        onChanged: (val) => setState(() {
+                          _selectedEmployee = val;
+                          if (val != null) {
+                            _isPfApplicable = val.isPfApplicable;
+                            _isEsicApplicable = val.isEsicApplicable;
+                          }
+                        }),
                       ),
                       const SizedBox(height: 18),
                     ],
@@ -465,27 +475,66 @@ class _CreateOfferLetterDialogState
                           ),
                           const SizedBox(height: 14),
 
-                          // Basic, HRA, SA
+                          Row(
+                            children: [
+                              Expanded(
+                                child: SwitchListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  title: Text(
+                                    'PF Applicable',
+                                    style: AppTypography.labelSmall,
+                                  ),
+                                  value: _isPfApplicable,
+                                  activeColor: AppColors.primary,
+                                  onChanged: (val) {
+                                    setState(() {
+                                      _isPfApplicable = val;
+                                      _recalcSalary(
+                                        double.tryParse(_ctcController.text) ??
+                                            0,
+                                      );
+                                    });
+                                  },
+                                ),
+                              ),
+                              Expanded(
+                                child: SwitchListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  title: Text(
+                                    'ESIC Applicable',
+                                    style: AppTypography.labelSmall,
+                                  ),
+                                  value: _isEsicApplicable,
+                                  activeColor: AppColors.primary,
+                                  onChanged: (val) {
+                                    setState(() {
+                                      _isEsicApplicable = val;
+                                      _recalcSalary(
+                                        double.tryParse(_ctcController.text) ??
+                                            0,
+                                      );
+                                    });
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+
+                          // Basic, HRA
                           Row(
                             children: [
                               Expanded(
                                 child: _salaryField(
-                                  'Basic (50%)',
+                                  'Basic (60% of Gross)',
                                   _basicController,
                                 ),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: _salaryField(
-                                  'HRA (25%)',
+                                  'HRA (40% of Gross)',
                                   _hraController,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: _salaryField(
-                                  'SA (remaining)',
-                                  _saController,
                                 ),
                               ),
                             ],
@@ -496,7 +545,7 @@ class _CreateOfferLetterDialogState
                           if (_ctcController.text.isNotEmpty) ...[
                             const Divider(),
                             const SizedBox(height: 8),
-                            _buildSalarySummary(),
+                            _buildEnhancedSalarySummary(),
                           ],
                         ],
                       ),
@@ -591,6 +640,70 @@ class _CreateOfferLetterDialogState
             ),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
           ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEnhancedSalarySummary() {
+    final basic = double.tryParse(_basicController.text) ?? 0;
+    final hra = double.tryParse(_hraController.text) ?? 0;
+    final sa = double.tryParse(_saController.text) ?? 0;
+    final gross = basic + hra + sa;
+    final pfEmp = _isPfApplicable ? (basic * 0.12).round() : 0;
+    final esicEmp = _isEsicApplicable ? (gross * 0.0075).round() : 0;
+    final totalDeductions = pfEmp + esicEmp;
+    final netPay = gross - totalDeductions;
+    final pfEmployer = _isPfApplicable ? (basic * 0.12).round() : 0;
+    final esicEmployer = _isEsicApplicable ? (gross * 0.0325).round() : 0;
+    final totalEmployerDeductions = pfEmployer + esicEmployer;
+    final monthlyCtc = gross + totalEmployerDeductions;
+
+    return Column(
+      children: [
+        _summaryRow('Gross Salary', 'Rs ${gross.toInt()}', AppColors.primary),
+        _summaryRow(
+          'PF Employee (12%)',
+          '-Rs $pfEmp',
+          _isPfApplicable ? AppColors.warning : AppColors.textTertiary,
+        ),
+        _summaryRow(
+          'ESIC Employee (0.75%)',
+          '-Rs $esicEmp',
+          _isEsicApplicable ? AppColors.warning : AppColors.textTertiary,
+        ),
+        _summaryRow(
+          'Total Employee Deduction',
+          'Rs ${totalDeductions.toInt()}',
+          AppColors.warning,
+        ),
+        const Divider(),
+        _summaryRow(
+          'Net Pay in Hand',
+          'Rs ${netPay.toInt()}',
+          AppColors.success,
+          bold: true,
+        ),
+        const Divider(),
+        _summaryRow(
+          'PF Employer (12%)',
+          'Rs $pfEmployer',
+          _isPfApplicable ? AppColors.info : AppColors.textTertiary,
+        ),
+        _summaryRow(
+          'ESIC Employer (3.25%)',
+          'Rs $esicEmployer',
+          _isEsicApplicable ? AppColors.info : AppColors.textTertiary,
+        ),
+        _summaryRow(
+          'Total Employer Deduction',
+          'Rs ${totalEmployerDeductions.toInt()}',
+          AppColors.info,
+        ),
+        _summaryRow(
+          'Monthly CTC',
+          'Rs ${monthlyCtc.toInt()}',
+          AppColors.primary,
         ),
       ],
     );
@@ -732,6 +845,8 @@ class _CreateOfferLetterDialogState
           ctc: ctc,
           joiningDate: _joiningDate,
           status: 'draft',
+          isPfApplicable: _isPfApplicable,
+          isEsicApplicable: _isEsicApplicable,
           remarks: _remarksController.text.trim().isEmpty
               ? null
               : _remarksController.text.trim(),
@@ -750,5 +865,13 @@ class _CreateOfferLetterDialogState
         _error = e.toString().replaceFirst('Exception: ', '');
       });
     }
+  }
+
+  double _calculateGrossFromCtc(double ctc) {
+    final employerFactor =
+        1 +
+        (_isPfApplicable ? 0.072 : 0) +
+        (_isEsicApplicable ? 0.0325 : 0);
+    return employerFactor == 0 ? ctc : ctc / employerFactor;
   }
 }

@@ -14,6 +14,7 @@ class AppwriteConfig {
   static const String notificationsCollectionId = 'notifications';
   static const String employeeDocumentsCollectionId = 'employee_documents';
   static const String visitsCollectionId = 'visits';
+  static const String companySettingsCollectionId = 'company_settings';
 
   // Storage
   static const String visitSelfiesBucketId = 'employee_documents';

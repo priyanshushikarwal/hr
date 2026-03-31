@@ -272,6 +272,19 @@ void main() async {
     _attr('updatedBy', 'string', size: 100),
   ]);
 
+  await _createCollection(databases, 'employee_documents', 'Employee Documents', [
+    _attr('employeeId', 'string', size: 100, required: true),
+    _attr('documentName', 'string', size: 255, required: true),
+    _attr('documentType', 'string', size: 100, required: true),
+    _attr('fileId', 'string', size: 100, required: true),
+    _attr('fileUrl', 'string', size: 500),
+    _attr('uploadedAt', 'string', size: 50, required: true),
+    _attr('approvalStatus', 'string', size: 20),
+    _attr('approvedBy', 'string', size: 100),
+    _attr('reviewedAt', 'string', size: 50),
+    _attr('rejectionReason', 'string', size: 500),
+  ]);
+
   await _createCollection(databases, 'visits', 'Visits', [
     _attr('employeeId', 'string', size: 100, required: true),
     _attr('employeeName', 'string', size: 200),

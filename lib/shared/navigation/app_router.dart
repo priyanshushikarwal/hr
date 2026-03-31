@@ -18,6 +18,7 @@ import '../../features/leave/presentation/screens/leave_approval_screen.dart';
 import '../../features/visit/presentation/screens/visit_screen.dart';
 import '../../features/tasks/presentation/screens/tasks_screen.dart';
 import '../../features/experience/presentation/screens/experience_screen.dart';
+import '../../features/settings/presentation/screens/settings_screen.dart';
 
 /// App Router Configuration using GoRouter with Auth Guards
 class AppRouter {
@@ -264,7 +265,7 @@ class AppRouter {
               name: 'settings',
               pageBuilder: (context, state) => CustomTransitionPage(
                 key: state.pageKey,
-                child: const _PlaceholderScreen(title: 'Settings'),
+                child: const SettingsScreen(),
                 transitionsBuilder: _fadeTransition,
               ),
             ),

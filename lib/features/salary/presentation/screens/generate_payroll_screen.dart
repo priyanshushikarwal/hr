@@ -207,12 +207,13 @@ class _GeneratePayrollScreenState extends ConsumerState<GeneratePayrollScreen> {
         children: [
           _buildSummaryRow('Total Work Days', '${summary.totalDays}'),
           _buildSummaryRow('Present Days', '${summary.presentDays}', color: AppColors.success),
+          _buildSummaryRow('Late Days', '${summary.lateDays}', color: AppColors.warning),
           _buildSummaryRow('Absent Days', '${summary.absentDays}', color: AppColors.error),
           _buildSummaryRow('Half Days', '${summary.halfDays}', color: AppColors.warning),
           _buildSummaryRow('Leave Days', '${summary.leaveDays}', color: AppColors.info),
           _buildSummaryRow('Hol/Weekends', '${summary.holidays + summary.weekends}'),
           const Divider(),
-          _buildSummaryRow('Payable Days', '${summary.presentDays + summary.holidays + summary.weekends + (summary.halfDays * 0.5)}', 
+          _buildSummaryRow('Payable Days', '${summary.presentDays + summary.lateDays + summary.holidays + summary.weekends + (summary.halfDays * 0.5)}', 
             isBold: true, color: AppColors.primary),
         ],
       ),
@@ -277,8 +278,16 @@ class _GeneratePayrollScreenState extends ConsumerState<GeneratePayrollScreen> {
     );
 
     final daysInMonth = summary.totalDays;
-    final payableDays = summary.presentDays + summary.holidays + summary.weekends + (summary.halfDays * 0.5);
+    final payableDays =
+        summary.presentDays +
+        summary.lateDays +
+        summary.holidays +
+        summary.weekends +
+        (summary.halfDays * 0.5);
     final attendanceFactor = payableDays / daysInMonth;
+    final dailyWage = daysInMonth == 0 ? 0.0 : (_salaryStructure!.grossSalary / daysInMonth);
+    final lateDaysBeyondGrace = summary.lateDays <= 3 ? 0 : summary.lateDays - 3;
+    final lateDeduction = lateDaysBeyondGrace * dailyWage * 0.25;
 
     final proRataBasic = _salaryStructure!.basicSalary * attendanceFactor;
     final proRataGross = _salaryStructure!.grossSalary * attendanceFactor;
@@ -298,7 +307,14 @@ class _GeneratePayrollScreenState extends ConsumerState<GeneratePayrollScreen> {
     final pf = _isPfOverridden ? _overriddenPf : (proRataBasic * 0.12);
     final esic = _isEsicOverridden ? _overriddenEsic : (proRataGross * 0.0075);
     
-    final netSalary = proRataGross - pf - esic - _penalty + _adjustment - advanceDeduction;
+    final netSalary =
+        proRataGross -
+        pf -
+        esic -
+        lateDeduction -
+        _penalty +
+        _adjustment -
+        advanceDeduction;
 
     return Column(
       children: [
@@ -333,6 +349,16 @@ class _GeneratePayrollScreenState extends ConsumerState<GeneratePayrollScreen> {
                 });
               }),
               const Divider(),
+              _buildSummaryRow(
+                'Late Deduction',
+                '-${_formatCurrency(lateDeduction)}',
+                color: lateDeduction > 0 ? AppColors.error : AppColors.success,
+              ),
+              _buildSummaryRow(
+                'Late Days Beyond Grace',
+                '$lateDaysBeyondGrace',
+                color: AppColors.warning,
+              ),
               _buildSummaryRow('Advance Recovery', '-${_formatCurrency(advanceDeduction)}', color: AppColors.error),
               
               const SizedBox(height: AppSpacing.md),

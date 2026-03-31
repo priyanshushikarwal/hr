@@ -8,6 +8,10 @@ class EmployeeDocument extends Equatable {
   final String fileId;
   final String fileUrl;
   final DateTime uploadedAt;
+  final String approvalStatus;
+  final String? approvedBy;
+  final DateTime? reviewedAt;
+  final String? rejectionReason;
 
   const EmployeeDocument({
     required this.id,
@@ -17,6 +21,10 @@ class EmployeeDocument extends Equatable {
     required this.fileId,
     required this.fileUrl,
     required this.uploadedAt,
+    this.approvalStatus = 'pending',
+    this.approvedBy,
+    this.reviewedAt,
+    this.rejectionReason,
   });
 
   factory EmployeeDocument.fromJson(Map<String, dynamic> json) {
@@ -30,6 +38,12 @@ class EmployeeDocument extends Equatable {
       uploadedAt: json['uploadedAt'] != null
           ? DateTime.parse(json['uploadedAt'])
           : DateTime.now(),
+      approvalStatus: json['approvalStatus'] ?? 'pending',
+      approvedBy: json['approvedBy'],
+      reviewedAt: json['reviewedAt'] != null
+          ? DateTime.tryParse(json['reviewedAt'])
+          : null,
+      rejectionReason: json['rejectionReason'],
     );
   }
 
@@ -41,8 +55,16 @@ class EmployeeDocument extends Equatable {
       'fileId': fileId,
       'fileUrl': fileUrl,
       'uploadedAt': uploadedAt.toIso8601String(),
+      'approvalStatus': approvalStatus,
+      'approvedBy': approvedBy,
+      'reviewedAt': reviewedAt?.toIso8601String(),
+      'rejectionReason': rejectionReason,
     };
   }
+
+  bool get isPending => approvalStatus == 'pending';
+  bool get isApproved => approvalStatus == 'approved';
+  bool get isRejected => approvalStatus == 'rejected';
 
   @override
   List<Object?> get props => [
@@ -53,5 +75,9 @@ class EmployeeDocument extends Equatable {
     fileId,
     fileUrl,
     uploadedAt,
+    approvalStatus,
+    approvedBy,
+    reviewedAt,
+    rejectionReason,
   ];
 }

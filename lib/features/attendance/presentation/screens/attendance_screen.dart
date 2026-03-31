@@ -289,6 +289,7 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
     final workingDays = daysInMonth - weekendCount;
 
     final presentCount = records.where((r) => r.isPresent).length;
+    final lateCount = records.where((r) => r.isLate).length;
     final absentCount = records.where((r) => r.isAbsent).length;
     final leaveCount = records.where((r) => r.isOnLeave).length;
     final halfDayCount = records.where((r) => r.isHalfDay).length;
@@ -312,6 +313,16 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
               : '0%',
           icon: AppIcons.active,
           color: AppColors.success,
+        ),
+        const SizedBox(width: AppSpacing.md),
+        _AttendanceSummaryCard(
+          title: 'Late',
+          value: lateCount.toString(),
+          subtitle: workingDays > 0
+              ? '${(lateCount / workingDays * 100).toStringAsFixed(1)}%'
+              : '0%',
+          icon: AppIcons.clock,
+          color: AppColors.warning,
         ),
         const SizedBox(width: AppSpacing.md),
         _AttendanceSummaryCard(
@@ -374,15 +385,17 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
           // Legend
           Padding(
             padding: const EdgeInsets.only(bottom: AppSpacing.md),
-            child: Row(
-              children: [
-                _LegendItem(color: AppColors.success, label: 'Present'),
-                const SizedBox(width: 16),
-                _LegendItem(color: AppColors.error, label: 'Absent'),
-                const SizedBox(width: 16),
-                _LegendItem(color: AppColors.warning, label: 'Leave'),
-                const SizedBox(width: 16),
-                _LegendItem(color: AppColors.secondary, label: 'Half Day'),
+              child: Row(
+                children: [
+                  _LegendItem(color: AppColors.success, label: 'Present'),
+                  const SizedBox(width: 16),
+                  _LegendItem(color: AppColors.warning, label: 'Late'),
+                  const SizedBox(width: 16),
+                  _LegendItem(color: AppColors.error, label: 'Absent'),
+                  const SizedBox(width: 16),
+                  _LegendItem(color: AppColors.warningDark, label: 'Leave'),
+                  const SizedBox(width: 16),
+                  _LegendItem(color: AppColors.secondary, label: 'Half Day'),
                 const SizedBox(width: 16),
                 _LegendItem(
                   color: AppColors.textTertiary,
@@ -651,6 +664,8 @@ class _CalendarCellState extends State<_CalendarCell> {
     switch (widget.status) {
       case 'present':
         return AppColors.successSurface;
+      case 'late':
+        return AppColors.warningSurface;
       case 'absent':
         return AppColors.errorSurface;
       case 'leave':
@@ -672,6 +687,8 @@ class _CalendarCellState extends State<_CalendarCell> {
     switch (widget.status) {
       case 'present':
         return AppColors.successDark;
+      case 'late':
+        return AppColors.warningDark;
       case 'absent':
         return AppColors.errorDark;
       case 'leave':
@@ -794,6 +811,8 @@ class _AttendanceRow extends StatelessWidget {
     switch (status) {
       case 'present':
         return 'Present';
+      case 'late':
+        return 'Late';
       case 'absent':
         return 'Absent';
       case 'leave':
@@ -817,6 +836,8 @@ class _AttendanceRow extends StatelessWidget {
     switch (status) {
       case 'present':
         return StatusType.success;
+      case 'late':
+        return StatusType.warning;
       case 'absent':
         return StatusType.error;
       case 'leave':

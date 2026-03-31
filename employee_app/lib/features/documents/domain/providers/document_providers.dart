@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/services/realtime_service.dart';
 import '../../data/models/employee_document_model.dart';
 import '../../data/repositories/document_repository.dart';
 import '../../../profile/domain/providers/profile_providers.dart';
@@ -10,8 +11,16 @@ final documentRepositoryProvider = Provider<DocumentRepository>((ref) {
 final employeeDocumentsProvider = FutureProvider<List<EmployeeDocument>>((
   ref,
 ) async {
-  final profile = ref.watch(employeeProfileProvider).value;
+  final profile = await ref.watch(employeeProfileProvider.future);
   if (profile == null) return [];
+
+  RealtimeService.instance.subscribeToEmployeeDocuments();
+  final sub = RealtimeService.instance.documentStream.listen((event) {
+    if (event.data['employeeId'] == profile.id) {
+      ref.invalidateSelf();
+    }
+  });
+  ref.onDispose(sub.cancel);
 
   final repository = ref.read(documentRepositoryProvider);
   return repository.getEmployeeDocuments(profile.id);
@@ -31,7 +40,7 @@ class DocumentNotifier extends StateNotifier<AsyncValue<void>> {
   }) async {
     state = const AsyncValue.loading();
     try {
-      final profile = _ref.read(employeeProfileProvider).value;
+      final profile = await _ref.read(employeeProfileProvider.future);
       if (profile == null) throw Exception('Employee profile not loaded');
 
       await _repository.uploadDocument(
@@ -53,6 +62,34 @@ class DocumentNotifier extends StateNotifier<AsyncValue<void>> {
     state = const AsyncValue.loading();
     try {
       await _repository.deleteDocument(documentId, fileId);
+      _ref.invalidate(employeeDocumentsProvider);
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  Future<void> replaceDocument({
+    required String documentId,
+    required String previousFileId,
+    required String filePath,
+    required String fileName,
+    required String documentType,
+  }) async {
+    state = const AsyncValue.loading();
+    try {
+      final profile = await _ref.read(employeeProfileProvider.future);
+      if (profile == null) throw Exception('Employee profile not loaded');
+
+      await _repository.replaceDocument(
+        documentId: documentId,
+        previousFileId: previousFileId,
+        employeeId: profile.id,
+        filePath: filePath,
+        fileName: fileName,
+        documentType: documentType,
+      );
+
       _ref.invalidate(employeeDocumentsProvider);
       state = const AsyncValue.data(null);
     } catch (e, st) {

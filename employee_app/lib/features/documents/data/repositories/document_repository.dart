@@ -3,7 +3,6 @@ import 'package:appwrite/appwrite.dart';
 import '../../../../core/config/appwrite_config.dart';
 import '../../../../core/services/appwrite_service.dart';
 import '../models/employee_document_model.dart';
-import 'package:uuid/uuid.dart';
 
 class DocumentRepository {
   final Databases _databases;
@@ -24,7 +23,7 @@ class DocumentRepository {
     );
 
     return response.documents
-        .map((doc) => EmployeeDocument.fromJson(doc.data))
+        .map((doc) => EmployeeDocument.fromJson({...doc.data, 'id': doc.$id}))
         .toList();
   }
 
@@ -34,8 +33,6 @@ class DocumentRepository {
     required String fileName,
     required String documentType,
   }) async {
-    final fileId = const Uuid().v4();
-
     // 1. Upload to storage
     final file = await _storage.createFile(
       bucketId: AppwriteConfig.employeeDocumentsBucketId,
@@ -55,6 +52,10 @@ class DocumentRepository {
       'fileId': file.$id,
       'fileUrl': fileUrl,
       'uploadedAt': DateTime.now().toIso8601String(),
+      'approvalStatus': 'pending',
+      'approvedBy': '',
+      'reviewedAt': '',
+      'rejectionReason': '',
     };
 
     final doc = await _databases.createDocument(
@@ -63,6 +64,53 @@ class DocumentRepository {
       documentId: ID.unique(),
       data: documentData,
     );
+
+    return EmployeeDocument.fromJson({...doc.data, '\$id': doc.$id});
+  }
+
+  Future<EmployeeDocument> replaceDocument({
+    required String documentId,
+    required String previousFileId,
+    required String employeeId,
+    required String filePath,
+    required String fileName,
+    required String documentType,
+  }) async {
+    final file = await _storage.createFile(
+      bucketId: AppwriteConfig.employeeDocumentsBucketId,
+      fileId: ID.unique(),
+      file: InputFile.fromPath(path: filePath, filename: fileName),
+    );
+
+    final fileUrl =
+        '${AppwriteConfig.endpoint}/storage/buckets/${AppwriteConfig.employeeDocumentsBucketId}/files/${file.$id}/view?project=${AppwriteConfig.projectId}';
+
+    final doc = await _databases.updateDocument(
+      databaseId: AppwriteConfig.databaseId,
+      collectionId: AppwriteConfig.employeeDocumentsCollectionId,
+      documentId: documentId,
+      data: {
+        'employeeId': employeeId,
+        'documentName': fileName,
+        'documentType': documentType,
+        'fileId': file.$id,
+        'fileUrl': fileUrl,
+        'uploadedAt': DateTime.now().toIso8601String(),
+        'approvalStatus': 'pending',
+        'approvedBy': '',
+        'reviewedAt': '',
+        'rejectionReason': '',
+      },
+    );
+
+    try {
+      await _storage.deleteFile(
+        bucketId: AppwriteConfig.employeeDocumentsBucketId,
+        fileId: previousFileId,
+      );
+    } catch (_) {
+      // Ignore storage cleanup failures after successful replacement.
+    }
 
     return EmployeeDocument.fromJson({...doc.data, '\$id': doc.$id});
   }

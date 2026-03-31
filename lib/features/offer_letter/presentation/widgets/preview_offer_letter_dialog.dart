@@ -16,16 +16,20 @@ class PreviewOfferLetterDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('dd/MM/yyyy');
     final ctc = letter.ctc;
-    final basic = (ctc * 0.50).round();
-    final hra = (ctc * 0.25).round();
-    final sa = ctc.round() - basic - hra;
-    final gross = basic + hra + sa;
-    final pfEmp = (basic * 0.12).round();
-    final esicEmp = (gross * 0.0075).round();
+    final gross =
+        (ctc /
+                (1 +
+                    (letter.isPfApplicable ? 0.072 : 0) +
+                    (letter.isEsicApplicable ? 0.0325 : 0)))
+            .round();
+    final basic = (gross * 0.60).round();
+    final hra = gross - basic;
+    final pfEmp = letter.isPfApplicable ? (basic * 0.12).round() : 0;
+    final esicEmp = letter.isEsicApplicable ? (gross * 0.0075).round() : 0;
     final totalDeductions = pfEmp + esicEmp;
     final netPay = gross - totalDeductions;
-    final pfEmployer = (basic * 0.13).round();
-    final esicEmployer = (gross * 0.0325).round();
+    final pfEmployer = letter.isPfApplicable ? (basic * 0.12).round() : 0;
+    final esicEmployer = letter.isEsicApplicable ? (gross * 0.0325).round() : 0;
     final totalEmployerDeductions = pfEmployer + esicEmployer;
     final costToCompany = gross + totalEmployerDeductions;
 
@@ -39,7 +43,6 @@ class PreviewOfferLetterDialog extends StatelessWidget {
         constraints: const BoxConstraints(maxHeight: 750),
         child: Column(
           children: [
-            // Header Bar
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
               decoration: const BoxDecoration(
@@ -70,8 +73,6 @@ class PreviewOfferLetterDialog extends StatelessWidget {
                 ],
               ),
             ),
-
-            // Scrollable Letter Content
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(32),
@@ -92,7 +93,6 @@ class PreviewOfferLetterDialog extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Company Header
                       Center(
                         child: Column(
                           children: [
@@ -127,8 +127,6 @@ class PreviewOfferLetterDialog extends StatelessWidget {
                       const SizedBox(height: 6),
                       Container(height: 2, color: AppColors.primary),
                       const SizedBox(height: 14),
-
-                      // Ref & Date
                       Text(
                         'Ref. $refNo',
                         style: AppTypography.labelMedium.copyWith(
@@ -140,16 +138,12 @@ class PreviewOfferLetterDialog extends StatelessWidget {
                         style: AppTypography.bodySmall,
                       ),
                       const SizedBox(height: 14),
-
-                      // To
                       Text('To,', style: AppTypography.bodySmall),
                       Text(
                         letter.employeeName,
                         style: AppTypography.labelLarge,
                       ),
                       const SizedBox(height: 14),
-
-                      // Subject
                       RichText(
                         text: TextSpan(
                           style: AppTypography.bodySmall.copyWith(
@@ -170,7 +164,6 @@ class PreviewOfferLetterDialog extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 10),
-
                       Text(
                         'Dear ${letter.employeeName.split(' ').first},',
                         style: AppTypography.bodySmall.copyWith(
@@ -178,7 +171,6 @@ class PreviewOfferLetterDialog extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 6),
-
                       RichText(
                         text: TextSpan(
                           style: AppTypography.bodySmall.copyWith(
@@ -208,32 +200,24 @@ class PreviewOfferLetterDialog extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 14),
-
-                      // Sections
                       _sectionTitle('1. Commencement of Employment'),
                       _bodyText(
                         'Your employment will commence from ${DateFormat("d'-'MMM'-'yy").format(letter.joiningDate)}.',
                       ),
                       const SizedBox(height: 10),
-
                       _sectionTitle('2. Job Title & Reporting'),
                       _bodyText(
                         'Your designation will be ${letter.designation}.',
                       ),
                       const SizedBox(height: 10),
-
                       _sectionTitle('3. Salary & Benefits'),
                       _bulletPoint(
-                        'Your Cost to Company (CTC) will be ₹ ${ctc.toInt()}/- per month, as detailed in Annexure-A.',
+                        'Your Cost to Company (CTC) will be Rs ${ctc.toInt()}/- per month, as detailed in Annexure-A.',
                       ),
                       const SizedBox(height: 10),
-
                       _sectionTitle('4. Place of Posting'),
-                      _bodyText(
-                        'Your initial posting will be at Jaipur Office.',
-                      ),
+                      _bodyText('Your initial posting will be at Jaipur Office.'),
                       const SizedBox(height: 10),
-
                       _sectionTitle('5. Probation & Confirmation'),
                       _bulletPoint(
                         'You will be on probation for 3 months from your joining date.',
@@ -242,13 +226,11 @@ class PreviewOfferLetterDialog extends StatelessWidget {
                         'Upon successful completion, you will be issued a formal confirmation letter.',
                       ),
                       const SizedBox(height: 10),
-
                       _sectionTitle('6. Working Hours'),
                       _bulletPoint(
-                        'Normal office hours are 9:00 AM – 6:00 PM, Monday to Saturday.',
+                        'Normal office hours are 9:00 AM - 6:00 PM, Monday to Saturday.',
                       ),
                       const SizedBox(height: 10),
-
                       _sectionTitle('10. Termination & Notice Period'),
                       _bulletPoint(
                         'During probation: 7 days\' written notice.',
@@ -257,14 +239,11 @@ class PreviewOfferLetterDialog extends StatelessWidget {
                         'After confirmation: 30 days\' written notice.',
                       ),
                       const SizedBox(height: 10),
-
                       _sectionTitle('11. Confidentiality & NDA Clause'),
                       _bulletPoint(
                         'You shall maintain strict confidentiality regarding all company information.',
                       ),
                       const SizedBox(height: 20),
-
-                      // Signature Section
                       Text(
                         'For Doon Infrapower Projects Pvt. Ltd.',
                         style: AppTypography.labelMedium.copyWith(
@@ -279,17 +258,13 @@ class PreviewOfferLetterDialog extends StatelessWidget {
                         fit: BoxFit.contain,
                       ),
                       const SizedBox(height: 16),
-
-                      // Salary Breakup
                       Container(height: 2, color: AppColors.primary),
                       const SizedBox(height: 14),
                       Text(
-                        'Annexure – A: Salary Breakup',
+                        'Annexure - A: Salary Breakup',
                         style: AppTypography.titleSmall,
                       ),
                       const SizedBox(height: 10),
-
-                      // Salary Table
                       Table(
                         border: TableBorder.all(color: AppColors.border),
                         columnWidths: const {
@@ -302,36 +277,30 @@ class PreviewOfferLetterDialog extends StatelessWidget {
                           _tableHeaderRow(),
                           _tableRow('1', 'BASIC', basic),
                           _tableRow('2', 'HRA', hra),
-                          _tableRow('3', 'SA', sa),
+                          _tableRow('3', 'GROSS SALARY', gross, highlight: true),
+                          _tableRow('4', 'PF share employee', pfEmp),
+                          _tableRow('5', 'ESIC employee', esicEmp),
                           _tableRow(
-                            '4',
-                            'GROSS SALARY',
-                            gross,
-                            highlight: true,
-                          ),
-                          _tableRow('5', 'PF share employee', pfEmp),
-                          _tableRow('6', 'ESIC employee', esicEmp),
-                          _tableRow(
-                            '7',
+                            '6',
                             'TOTAL EMPLOYEE DEDUCTION',
                             totalDeductions,
                           ),
                           _tableRow(
-                            '8',
+                            '7',
                             'NET PAY IN HAND (A-B)',
                             netPay,
                             highlight: true,
                           ),
-                          _tableRow('9', 'PF share employer', pfEmployer),
-                          _tableRow('10', 'ESIC employer', esicEmployer),
+                          _tableRow('8', 'PF share employer', pfEmployer),
+                          _tableRow('9', 'ESIC employer', esicEmployer),
                           _tableRow(
-                            '11',
-                            'Total employer deduction©',
+                            '10',
+                            'Total employer deduction (C)',
                             totalEmployerDeductions,
                           ),
                           _tableRow(
-                            '12',
-                            'COST OF COMPANY IN RUPEES(A+C)',
+                            '11',
+                            'COST OF COMPANY IN RUPEES (A+C)',
                             costToCompany,
                             highlight: true,
                           ),
@@ -404,9 +373,7 @@ class PreviewOfferLetterDialog extends StatelessWidget {
     bool highlight = false,
   }) {
     return TableRow(
-      decoration: highlight
-          ? BoxDecoration(color: Colors.yellow.shade50)
-          : null,
+      decoration: highlight ? BoxDecoration(color: Colors.yellow.shade50) : null,
       children: [
         _dataCell(sno, center: true),
         _dataCell(label, bold: highlight),
@@ -422,14 +389,18 @@ class PreviewOfferLetterDialog extends StatelessWidget {
       alignment: Alignment.center,
       child: Text(
         text,
-        style: AppTypography.labelSmall.copyWith(fontWeight: FontWeight.bold),
+        style: AppTypography.labelMedium.copyWith(fontWeight: FontWeight.bold),
       ),
     );
   }
 
-  Widget _dataCell(String text, {bool center = false, bool bold = false}) {
+  Widget _dataCell(
+    String text, {
+    bool center = false,
+    bool bold = false,
+  }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      padding: const EdgeInsets.all(8),
       alignment: center ? Alignment.center : Alignment.centerLeft,
       child: Text(
         text,

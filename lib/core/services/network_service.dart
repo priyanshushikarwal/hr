@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../config/appwrite_config.dart';
 
 /// Provides the current network connectivity status
 final networkStatusProvider =
@@ -12,6 +13,10 @@ enum NetworkStatus { online, offline }
 
 class NetworkStatusNotifier extends StateNotifier<NetworkStatus> {
   Timer? _pollTimer;
+  static final List<String> _healthHosts = [
+    Uri.parse(AppwriteConfig.endpoint).host,
+    'google.com',
+  ];
 
   NetworkStatusNotifier() : super(NetworkStatus.online) {
     _init();
@@ -28,23 +33,25 @@ class NetworkStatusNotifier extends StateNotifier<NetworkStatus> {
   }
 
   Future<void> _checkConnectivity() async {
-    try {
-      final result = await InternetAddress.lookup(
-        'google.com',
-      ).timeout(const Duration(seconds: 5));
-      if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
-        state = NetworkStatus.online;
-      } else {
-        state = NetworkStatus.offline;
+    for (final host in _healthHosts) {
+      try {
+        final result = await InternetAddress.lookup(
+          host,
+        ).timeout(const Duration(seconds: 5));
+        if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
+          state = NetworkStatus.online;
+          return;
+        }
+      } on SocketException catch (_) {
+        continue;
+      } on TimeoutException catch (_) {
+        continue;
+      } catch (_) {
+        continue;
       }
-    } on SocketException catch (_) {
-      state = NetworkStatus.offline;
-    } on TimeoutException catch (_) {
-      state = NetworkStatus.offline;
-    } catch (_) {
-      // Default to online if check fails for unknown reasons
-      state = NetworkStatus.online;
     }
+
+    state = NetworkStatus.offline;
   }
 
   /// Manually trigger a check

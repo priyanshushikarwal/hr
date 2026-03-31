@@ -71,6 +71,10 @@ class EmployeeDocumentRepository {
       'fileId': file.$id,
       'fileUrl': fileUrl,
       'uploadedAt': DateTime.now().toIso8601String(),
+      'approvalStatus': 'pending',
+      'approvedBy': '',
+      'reviewedAt': '',
+      'rejectionReason': '',
     };
 
     final doc = await _databases.createDocument(
@@ -78,6 +82,27 @@ class EmployeeDocumentRepository {
       collectionId: AppwriteConfig.employeeDocumentsCollectionId,
       documentId: ID.unique(),
       data: documentData,
+    );
+
+    return EmployeeDocument.fromJson({...doc.data, 'id': doc.$id});
+  }
+
+  Future<EmployeeDocument> updateApprovalStatus({
+    required String documentId,
+    required String approvalStatus,
+    required String approvedBy,
+    String? rejectionReason,
+  }) async {
+    final doc = await _databases.updateDocument(
+      databaseId: AppwriteConfig.databaseId,
+      collectionId: AppwriteConfig.employeeDocumentsCollectionId,
+      documentId: documentId,
+      data: {
+        'approvalStatus': approvalStatus,
+        'approvedBy': approvedBy,
+        'reviewedAt': DateTime.now().toIso8601String(),
+        'rejectionReason': rejectionReason ?? '',
+      },
     );
 
     return EmployeeDocument.fromJson({...doc.data, 'id': doc.$id});

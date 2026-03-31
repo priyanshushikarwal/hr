@@ -19,6 +19,8 @@ class OfferLetter extends Equatable {
   final String? pdfStorageId;
   final String? localPdfPath;
   final String? remarks;
+  final bool isPfApplicable;
+  final bool isEsicApplicable;
   final DateTime createdAt;
   final DateTime updatedAt;
   final String? createdBy;
@@ -41,6 +43,8 @@ class OfferLetter extends Equatable {
     this.pdfStorageId,
     this.localPdfPath,
     this.remarks,
+    this.isPfApplicable = true,
+    this.isEsicApplicable = true,
     required this.createdAt,
     required this.updatedAt,
     this.createdBy,
@@ -64,6 +68,8 @@ class OfferLetter extends Equatable {
     String? pdfStorageId,
     String? localPdfPath,
     String? remarks,
+    bool? isPfApplicable,
+    bool? isEsicApplicable,
     DateTime? createdAt,
     DateTime? updatedAt,
     String? createdBy,
@@ -86,6 +92,8 @@ class OfferLetter extends Equatable {
       pdfStorageId: pdfStorageId ?? this.pdfStorageId,
       localPdfPath: localPdfPath ?? this.localPdfPath,
       remarks: remarks ?? this.remarks,
+      isPfApplicable: isPfApplicable ?? this.isPfApplicable,
+      isEsicApplicable: isEsicApplicable ?? this.isEsicApplicable,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       createdBy: createdBy ?? this.createdBy,
@@ -145,6 +153,8 @@ class OfferLetter extends Equatable {
       pdfStorageId: json['pdfStorageId'] as String?,
       localPdfPath: json['localPdfPath'] as String?,
       remarks: json['remarks'] as String?,
+      isPfApplicable: json['isPfApplicable'] as bool? ?? true,
+      isEsicApplicable: json['isEsicApplicable'] as bool? ?? true,
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'] as String)
           : DateTime.now(),

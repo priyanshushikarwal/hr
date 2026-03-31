@@ -37,10 +37,12 @@ class RealtimeService {
   RealtimeSubscription? _attendanceSubscription;
   RealtimeSubscription? _notificationSubscription;
   RealtimeSubscription? _leaveSubscription;
+  RealtimeSubscription? _documentSubscription;
 
   final _attendanceController = StreamController<RealtimeEvent>.broadcast();
   final _notificationController = StreamController<RealtimeEvent>.broadcast();
   final _leaveController = StreamController<RealtimeEvent>.broadcast();
+  final _documentController = StreamController<RealtimeEvent>.broadcast();
 
   /// Stream of attendance realtime events
   Stream<RealtimeEvent> get attendanceStream => _attendanceController.stream;
@@ -52,11 +54,15 @@ class RealtimeService {
   /// Stream of leave request realtime events
   Stream<RealtimeEvent> get leaveStream => _leaveController.stream;
 
+  /// Stream of employee document realtime events
+  Stream<RealtimeEvent> get documentStream => _documentController.stream;
+
   /// Subscribe to all relevant collections
   void subscribeAll() {
     subscribeToAttendance();
     subscribeToNotifications();
     subscribeToLeaveRequests();
+    subscribeToEmployeeDocuments();
   }
 
   /// Subscribe to attendance collection changes
@@ -140,6 +146,33 @@ class RealtimeService {
     }
   }
 
+  /// Subscribe to employee documents collection changes
+  void subscribeToEmployeeDocuments() {
+    try {
+      _documentSubscription?.close();
+      final channel =
+          'databases.${AppwriteConfig.databaseId}.collections.${AppwriteConfig.employeeDocumentsCollectionId}.documents';
+
+      _documentSubscription = _realtime.subscribe([channel]);
+      _documentSubscription!.stream.listen(
+        (response) {
+          final event = _parseEvent(
+            response,
+            AppwriteConfig.employeeDocumentsCollectionId,
+          );
+          if (event != null) {
+            _documentController.add(event);
+          }
+        },
+        onError: (error) {
+          debugPrint('Document realtime error: $error');
+        },
+      );
+    } catch (e) {
+      debugPrint('Failed to subscribe to employee documents: $e');
+    }
+  }
+
   /// Parse a realtime response into a RealtimeEvent
   RealtimeEvent? _parseEvent(RealtimeMessage response, String collectionId) {
     try {
@@ -174,9 +207,11 @@ class RealtimeService {
     _attendanceSubscription?.close();
     _notificationSubscription?.close();
     _leaveSubscription?.close();
+    _documentSubscription?.close();
     _attendanceSubscription = null;
     _notificationSubscription = null;
     _leaveSubscription = null;
+    _documentSubscription = null;
   }
 
   /// Dispose all resources
@@ -185,5 +220,6 @@ class RealtimeService {
     _attendanceController.close();
     _notificationController.close();
     _leaveController.close();
+    _documentController.close();
   }
 }

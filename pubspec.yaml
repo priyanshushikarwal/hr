@@ -68,6 +68,8 @@ dependencies:
   dart_appwrite: ^21.3.0
   http: ^1.6.0
   url_launcher: ^6.3.2
+  package_info_plus: ^9.0.0
+  archive: ^3.6.1
   
 dev_dependencies:
   flutter_test:

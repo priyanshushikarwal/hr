@@ -88,18 +88,31 @@ class OfferLetterPdfGenerator {
 
     // Calculate salary components from CTC
     final ctc = letter.ctc;
-    final basicSalary = basic ?? (ctc * 0.50);
-    final hraSalary = hra ?? (ctc * 0.25);
-    final saSalary = sa ?? (ctc - basicSalary - hraSalary);
-    final gross = basicSalary + hraSalary + saSalary;
-    final pfEmployee = (basicSalary * 0.12).roundToDouble();
-    final esicEmployee = (gross * 0.0075).roundToDouble();
-    final totalDeductions = pfEmployee + esicEmployee;
-    final netPay = gross - totalDeductions;
-    final pfEmployer = (basicSalary * 0.13).roundToDouble();
-    final esicEmployer = (gross * 0.0325).roundToDouble();
-    final totalEmployerDeductions = pfEmployer + esicEmployer;
-    final costToCompany = gross + totalEmployerDeductions;
+    final double grossBase =
+        ctc /
+        (1 +
+            (letter.isPfApplicable ? 0.072 : 0) +
+            (letter.isEsicApplicable ? 0.0325 : 0));
+    final double basicSalary = basic ?? (grossBase * 0.60);
+    final double hraSalary = hra ?? (grossBase - basicSalary);
+    final double saSalary = sa ?? 0.0;
+    final double gross = basicSalary + hraSalary + saSalary;
+    final double pfEmployee = letter.isPfApplicable
+        ? (basicSalary * 0.12).roundToDouble()
+        : 0.0;
+    final double esicEmployee = letter.isEsicApplicable
+        ? (gross * 0.0075).roundToDouble()
+        : 0.0;
+    final double totalDeductions = pfEmployee + esicEmployee;
+    final double netPay = gross - totalDeductions;
+    final double pfEmployer = letter.isPfApplicable
+        ? (basicSalary * 0.12).roundToDouble()
+        : 0.0;
+    final double esicEmployer = letter.isEsicApplicable
+        ? (gross * 0.0325).roundToDouble()
+        : 0.0;
+    final double totalEmployerDeductions = pfEmployer + esicEmployer;
+    final double costToCompany = gross + totalEmployerDeductions;
 
     // Reference number
     final refNo =

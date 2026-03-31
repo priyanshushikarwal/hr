@@ -45,6 +45,8 @@ class _AddEmployeeDrawerState extends State<AddEmployeeDrawer> {
   final _ifscCodeController = TextEditingController();
   final _panNumberController = TextEditingController();
   final _aadhaarNumberController = TextEditingController();
+  final _uanController = TextEditingController();
+  final _esicNumberController = TextEditingController();
 
   // Form State
   String? _employeeType;
@@ -53,6 +55,8 @@ class _AddEmployeeDrawerState extends State<AddEmployeeDrawer> {
   String? _gender;
   String? _maritalStatus;
   String? _currentState;
+  bool _isPfApplicable = false;
+  bool _isEsicApplicable = false;
 
   final List<_StepData> _steps = const [
     _StepData(title: 'Basic Info', icon: AppIcons.user),
@@ -93,6 +97,8 @@ class _AddEmployeeDrawerState extends State<AddEmployeeDrawer> {
     _ifscCodeController.dispose();
     _panNumberController.dispose();
     _aadhaarNumberController.dispose();
+    _uanController.dispose();
+    _esicNumberController.dispose();
     super.dispose();
   }
 
@@ -113,6 +119,8 @@ class _AddEmployeeDrawerState extends State<AddEmployeeDrawer> {
     _ifscCodeController.text = employee?.ifscCode ?? '';
     _panNumberController.text = employee?.panNumber ?? '';
     _aadhaarNumberController.text = employee?.aadhaarNumber ?? '';
+    _uanController.text = employee?.uan ?? '';
+    _esicNumberController.text = employee?.esicNumber ?? '';
 
     _employeeType = employee?.employeeType;
     _joiningDate = employee?.joiningDate;
@@ -120,6 +128,8 @@ class _AddEmployeeDrawerState extends State<AddEmployeeDrawer> {
     _gender = employee?.gender;
     _maritalStatus = employee?.maritalStatus;
     _currentState = employee?.currentState;
+    _isPfApplicable = employee?.isPfApplicable ?? false;
+    _isEsicApplicable = employee?.isEsicApplicable ?? false;
   }
 
   @override
@@ -680,6 +690,66 @@ class _AddEmployeeDrawerState extends State<AddEmployeeDrawer> {
         ),
         const SizedBox(height: AppSpacing.formFieldSpacing),
 
+        Row(
+          children: [
+            Expanded(
+              child: SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text('PF Applicable', style: AppTypography.labelMedium),
+                subtitle: Text(
+                  'Enable PF deduction',
+                  style: AppTypography.caption,
+                ),
+                value: _isPfApplicable,
+                activeColor: AppColors.primary,
+                onChanged: (value) => setState(() => _isPfApplicable = value),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(
+                  'ESIC Applicable',
+                  style: AppTypography.labelMedium,
+                ),
+                subtitle: Text(
+                  'Enable ESIC deduction',
+                  style: AppTypography.caption,
+                ),
+                value: _isEsicApplicable,
+                activeColor: AppColors.primary,
+                onChanged: (value) =>
+                    setState(() => _isEsicApplicable = value),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.formFieldSpacing),
+
+        Row(
+          children: [
+            Expanded(
+              child: AppTextField(
+                label: 'UAN Number',
+                hint: 'Enter UAN number',
+                controller: _uanController,
+                prefixIcon: AppIcons.pf,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: AppTextField(
+                label: 'ESIC Number',
+                hint: 'Enter ESIC number',
+                controller: _esicNumberController,
+                prefixIcon: AppIcons.esic,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.formFieldSpacing),
+
         // PF & ESIC Note
         Container(
           padding: const EdgeInsets.all(AppSpacing.md),
@@ -694,7 +764,7 @@ class _AddEmployeeDrawerState extends State<AddEmployeeDrawer> {
               const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Text(
-                  'PF and ESIC will be activated automatically after 3 months of joining as per company policy.',
+                  'PF and ESIC applicability saved here will be used in salary slip and payroll calculations.',
                   style: AppTypography.bodySmall.copyWith(
                     color: AppColors.infoDark,
                   ),
@@ -775,6 +845,12 @@ class _AddEmployeeDrawerState extends State<AddEmployeeDrawer> {
                     aadhaarNumber: _aadhaarNumberController.text.trim().isEmpty
                         ? null
                         : _aadhaarNumberController.text.trim(),
+                    uan: _uanController.text.trim().isEmpty
+                        ? null
+                        : _uanController.text.trim(),
+                    esicNumber: _esicNumberController.text.trim().isEmpty
+                        ? null
+                        : _esicNumberController.text.trim(),
                     joiningDate: _joiningDate ?? DateTime.now(),
                     dateOfBirth: _dateOfBirth,
                     gender: _gender,
@@ -794,8 +870,8 @@ class _AddEmployeeDrawerState extends State<AddEmployeeDrawer> {
                     status: widget.employee?.status ?? 'Active',
                     createdAt: widget.employee?.createdAt ?? DateTime.now(),
                     updatedAt: DateTime.now(),
-                    isPfApplicable: false,
-                    isEsicApplicable: false,
+                    isPfApplicable: _isPfApplicable,
+                    isEsicApplicable: _isEsicApplicable,
                   );
                   final pwd = _passwordController.text.trim();
                   widget.onSave(newEmployee, pwd.isEmpty ? null : pwd);

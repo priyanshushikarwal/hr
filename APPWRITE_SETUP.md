@@ -73,6 +73,12 @@ Create a database named: **`hrms_database`**
 - visitMode (Boolean)
 - createdAt (String)
 
+#### 7. `employee_documents` Collection
+- employeeId, documentName, documentType, fileId (String)
+- fileUrl, uploadedAt (String)
+- approvalStatus, approvedBy, reviewedAt (String?)
+- rejectionReason (String?)
+
 ---
 
 ## Step 3: Troubleshooting
